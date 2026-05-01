@@ -17,3 +17,4 @@ target_link_libraries(ui PUBLIC
         sfml-window
         sfml-system
         ImGui-SFML::ImGui-SFML # Подключаем графику и ImGui-SFML
+)

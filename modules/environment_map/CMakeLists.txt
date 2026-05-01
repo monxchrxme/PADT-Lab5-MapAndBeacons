@@ -1,7 +1,8 @@
 # Собираем все .cpp файлы модуля (генерация, raycasting)
 file(GLOB SOURCES "src/*.cpp")
 
-add_library(environment_map STATIC ${SOURCES})
+add_library(environment_map STATIC ${SOURCES}
+        include/MockEnvironment.hpp)
 
 # Публичные заголовки модуля лежат в include/
 # PUBLIC значит, что и сам модуль, и те, кто его прилинкуют, увидят эти .h файлы

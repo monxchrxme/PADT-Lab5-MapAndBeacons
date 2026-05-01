@@ -1,6 +1,7 @@
 file(GLOB SOURCES "src/*.cpp")
 
-add_library(navigation_beacons STATIC ${SOURCES})
+add_library(navigation_beacons STATIC ${SOURCES}
+        include/MockNavigator.hpp)
 
 target_include_directories(navigation_beacons PUBLIC 
         ${CMAKE_CURRENT_SOURCE_DIR}/include
