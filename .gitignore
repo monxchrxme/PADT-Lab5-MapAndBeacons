@@ -44,3 +44,6 @@ cmake-build-release/
 
 # mac
 .DS_Store
+
+# im gui temp 
+imgui.ini
