@@ -28,7 +28,8 @@ Navigator::~Navigator() {
 }
 
 LocationResult Navigator::estimateLocation(const Sequence<SignalData>& signals) const {
-    return TrilaterationSolver::solve(signals);
+    // Передаем центр экрана {400.0, 300.0} как начальную точку для поиска
+    return TrilaterationSolver::solve(signals, Point2D{400.0, 300.0});
 }
 
 void Navigator::updateEntities(float dt) {
@@ -38,14 +39,24 @@ void Navigator::updateEntities(float dt) {
         
         // Маяк шагает
         beacon->updatePhysics(dt, environment_);
-        // Маяк вычисляет свое положение (опрашивая Карту)
-        beacon->updateEstimation(environment_, beacons_); 
+
+        try {
+            // Маяк вычисляет свое положение (опрашивая Карту)
+            beacon->updateEstimation(environment_, beacons_); 
+        } catch (...) {
+            // Игнорируем ошибки соединения, маяк продолжит двигаться по физике, пока снова не поймает сигнал.
+        }
     }
 
     // Обновляем искомую цель
     target_->updatePhysics(dt, environment_);
     
-    // Цель опрашивает и Карту (стационарные вышки), и мобильные маяки,
-    // после чего внутри собирает все данные и запускает Трилатерацию
-    target_->updateEstimation(environment_, beacons_);
+
+    try {
+        // Цель опрашивает и Карту (стационарные вышки), и мобильные маяки,
+        // после чего внутри собирает все данные и запускает Трилатерацию
+        target_->updateEstimation(environment_, beacons_);
+    } catch (...) {
+        // Игнорируем потерю сигнала у главной цели
+    }
 }

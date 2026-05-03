@@ -1,7 +1,6 @@
 file(GLOB SOURCES "src/*.cpp")
 
 add_library(navigation_beacons STATIC ${SOURCES}
-        include/MockNavigator.hpp
         include/entities/Entity.hpp
         src/entities/Entity.cpp
         include/entities/MobileBeacon.hpp

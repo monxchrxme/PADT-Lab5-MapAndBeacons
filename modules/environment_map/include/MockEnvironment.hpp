@@ -1,6 +1,8 @@
 #pragma once
 #include "IEnvironment.hpp"
 #include "sequences/mutable_array_sequence.hpp" 
+#include "Structures.hpp"
+#include "MathUtils.hpp"
 #include <cmath> 
 
 class MockEnvironment final : public IEnvironment {
@@ -12,31 +14,42 @@ public:
     MockEnvironment(const MockEnvironment&) = delete;
     MockEnvironment& operator=(const MockEnvironment&) = delete;
 
-    [[nodiscard]] bool isPassable(Point2D /*point*/) const override {
-        return true; // В заглушке препятствий нет
-    }
+    [[nodiscard]] bool isPassable(Point2D p) const override {
+        // Ограничиваем карту размером окна
+        if (p.x < 20.0 || p.x > 780.0 || p.y < 20.0 || p.y > 580.0) return false;
+        
+        // ТЕСТОВАЯ СТЕНА (Бетонный блок по центру) 
+        if (p.x > 380.0 && p.x < 420.0 && p.y > 200.0 && p.y < 400.0) return false;
 
-    [[nodiscard]] double calculateSignal(Point2D /*source*/, Point2D /*target*/) const override {
-        return 1.0; // Сигнал идеальный
+        return true; 
     }
 
     void triggerLazyGeneration(Point2D /*currentPos*/) override {
         // Пока ничего не делаем
     }
 
-    // Возвращаем конкретный тип по значению (RVO - Return Value Optimization предотвратит лишнее копирование)
-    [[nodiscard]] MutableArraySequence<Point2D> getStaticTowers() const override {
-        MutableArraySequence<Point2D> towers;
-        // Для теста добавим одну вышку в центр (если в твоей библиотеке есть метод добавления, например Append)
-        towers.append(Point2D{400.0, 300.0}); 
-        return towers; 
-    }
-
     [[nodiscard]] double calculateSignal(Point2D source, Point2D target) const override {
-        // Физически корректное затухание сигнала в пустом пространстве (1 / d^2)
         double dist = std::hypot(target.x - source.x, target.y - source.y);
-        if (dist < 1.0) dist = 1.0; // Защита от бесконечного сигнала в упор
-        return 1.0 / (dist * dist);
+        if (dist < 1.0) dist = 1.0;
+        
+        double signal = g_Settings.baseTxPower / (dist * dist);
+
+        // Имитируем "шум эфира"
+        double noiseFactor = math::randomDouble(1.0 - g_Settings.noiseVariation, 1.0 + g_Settings.noiseVariation);
+        signal *= noiseFactor;
+
+        // RAYCASTING (Проверка пересечения луча со стеной)
+        // Если источник и цель по разные стороны от x=400
+        if ((source.x < 400.0 && target.x > 400.0) || (source.x > 400.0 && target.x < 400.0)) {
+            // Находим точку пересечения луча с линией x=400
+            double intersectY = source.y + (400.0 - source.x) * (target.y - source.y) / (target.x - source.x);
+            // Если точка пересечения попадает в нашу стену (y от 200 до 400)
+            if (intersectY > 200.0 && intersectY < 400.0) {
+                // Стена пропускает только часть сигнала (зависит от настроек)
+                signal *= g_Settings.wallAttenuation; 
+            }
+        }
+        return signal;
     }
 
     [[nodiscard]] MutableArraySequence<Point2D> getStaticTowers() const override {

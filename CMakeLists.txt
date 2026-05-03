@@ -14,6 +14,7 @@ if(MSVC OR CMAKE_CXX_COMPILER_FRONTEND_VARIANT STREQUAL "MSVC")
             "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL"
             CACHE STRING "" FORCE
     )
+    add_compile_options(/utf-8)
 endif()
 
 # include(FetchContent)

@@ -20,7 +20,7 @@ void TargetObject::updateEstimation(const IEnvironment* env, const Sequence<Mobi
     for (int i = 0; i < staticTowers.get_length(); ++i) {
         Point2D towerPos = staticTowers[i];
         double rssi = env->calculateSignal(realPosition_, towerPos);
-        if (rssi > 0.05) {
+        if (rssi > g_Settings.signalThreshold) {
             allSignals.append(SignalData{towerPos, rssi, 0.0}); 
         }
     }
@@ -45,6 +45,16 @@ void TargetObject::updateEstimation(const IEnvironment* env, const Sequence<Mobi
         }
     }
 
-    // Трилатерация 
-    estimation_ = TrilaterationSolver::solve(allSignals);
+    // Трилатерация (с учетом предыдущей позиции)
+    LocationResult rawEstimation = TrilaterationSolver::solve(allSignals, estimation_.estimatedPos);
+
+    // Фильтр низких частот 
+    // smoothing = 0.1 означает, что мы берем 90% от старой позиции и только 10% от новой
+    // Это убирает резкие "дергания" от шума (Jitter), делая движение круга плавным 
+    estimation_.estimatedPos.x = math::lerp(estimation_.estimatedPos.x, rawEstimation.estimatedPos.x, g_Settings.smoothing);
+    estimation_.estimatedPos.y = math::lerp(estimation_.estimatedPos.y, rawEstimation.estimatedPos.y, g_Settings.smoothing);
+    
+    // Радиус ошибки тоже сглаживает, плюс добавляем базовую "неуверенность" от шума среды
+    double targetError = rawEstimation.errorRadius + g_Settings.baseUncertainty;; // добавляем радиус для компенсации аппаратной погрешности
+    estimation_.errorRadius = math::lerp(estimation_.errorRadius, targetError, g_Settings.smoothing);
 }

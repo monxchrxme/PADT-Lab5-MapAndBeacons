@@ -2,7 +2,9 @@
 
 file(GLOB SOURCES "src/*.cpp")
 
-add_library(ui STATIC ${SOURCES})
+add_library(ui STATIC ${SOURCES}
+        include/NavigationRenderer.hpp
+        src/NavigationRenderer.cpp)
 
 target_include_directories(ui PUBLIC 
         ${CMAKE_CURRENT_SOURCE_DIR}/include

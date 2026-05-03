@@ -3,7 +3,7 @@
 #include "exceptions/NavigationExceptions.hpp"
 #include <cmath>
 
-LocationResult TrilaterationSolver::solve(const Sequence<SignalData>& signals) {
+LocationResult TrilaterationSolver::solve(const Sequence<SignalData>& signals, Point2D currentGuess) {
     const int count = signals.get_length();
     
     // Если источников меньше 3-х, позицию вычислить невозможно математически
@@ -11,18 +11,11 @@ LocationResult TrilaterationSolver::solve(const Sequence<SignalData>& signals) {
         throw SignalLostException();
     }
 
-    // Начальное приближение - Центр масс всех вышек
-    Point2D guess = {0.0, 0.0};
-    for (int i = 0; i < count; ++i) {
-        guess.x += signals[i].sourcePosition.x;
-        guess.y += signals[i].sourcePosition.y;
-    }
-    guess.x /= count;
-    guess.y /= count;
+    // Начальное приближение - это то, где мы были в прошлом кадре 
+    Point2D guess = currentGuess;
 
     // Метод Градиентного Спуска 
     const int maxIterations = 100;
-    const double learningRate = 0.5; // Шаг спуска (скорость обучения)
 
     for (int iter = 0; iter < maxIterations; ++iter) {
         double gradX = 0.0;
@@ -30,7 +23,7 @@ LocationResult TrilaterationSolver::solve(const Sequence<SignalData>& signals) {
 
         for (int i = 0; i < count; ++i) {
             SignalData sig = signals[i];
-            double targetDist = math::rssiToDistance(sig.rssi);
+            double targetDist = math::rssiToDistance(sig.rssi, g_Settings.baseTxPower);
             
             // Текущее расстояние от нашего "приближения" до вышки
             double dx = guess.x - sig.sourcePosition.x;
@@ -52,15 +45,15 @@ LocationResult TrilaterationSolver::solve(const Sequence<SignalData>& signals) {
         gradY /= count;
 
         // Делаем шаг в сторону УМЕНЬШЕНИЯ ошибки (против градиента)
-        guess.x -= learningRate * gradX;
-        guess.y -= learningRate * gradY;
+        guess.x -= g_Settings.learningRate  * gradX;
+        guess.y -= g_Settings.learningRate  * gradY;
     }
 
     // Вычисление итогового "Радиуса погрешности" 
     double totalErrorRadius = 0.0;
     for (int i = 0; i < count; ++i) {
         SignalData sig = signals[i];
-        double targetDist = math::rssiToDistance(sig.rssi);
+        double targetDist = math::rssiToDistance(sig.rssi, g_Settings.baseTxPower);
         double finalDist = math::distance(guess, sig.sourcePosition);
         
         // Погрешность = Ошибка вычисления дистанции + собственная погрешность самого маяка

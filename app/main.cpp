@@ -8,6 +8,7 @@
 #include "exceptions/EnvironmentExceptions.hpp"
 #include "exceptions/NavigationExceptions.hpp"
 #include "Navigator.hpp"
+#include "NavigationRenderer.hpp"
 
 void runSimulation() {
     IEnvironment* environment = nullptr;
@@ -36,7 +37,22 @@ void runSimulation() {
         throw std::runtime_error("Failed to initialize ImGui-SFML");
     }
 
+    // ФИКС ДЛЯ РУССКОГО ЯЗЫКА
+
+    ImGuiIO& io = ImGui::GetIO();
+    io.Fonts->Clear(); 
+    
+    // Загружаем Arial из системы. 16.0f - размер шрифта.
+    // передаем GetGlyphRangesCyrillic(), чтобы ImGui загрузил русские буквы
+    io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\arial.ttf", 16.0f, nullptr, io.Fonts->GetGlyphRangesCyrillic());
+    
+    if (!ImGui::SFML::UpdateFontTexture()) {
+        std::cerr << "Warning: Failed to update ImGui font texture.\n";
+    }
+
     sf::Clock deltaClock;
+
+    NavigationRenderer renderer;
 
     // Главный цикл
     while (window.isOpen()) {
@@ -50,6 +66,17 @@ void runSimulation() {
 
         sf::Time dt = deltaClock.restart();
         ImGui::SFML::Update(window, dt);
+
+        // УПРАВЛЕНИЕ С КЛАВИАТУРЫ (WASD)
+        double dx = 0.0;
+        double dy = 0.0;
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::W) || sf::Keyboard::isKeyPressed(sf::Keyboard::Up))    dy -= 1.0;
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::S) || sf::Keyboard::isKeyPressed(sf::Keyboard::Down))  dy += 1.0;
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::A) || sf::Keyboard::isKeyPressed(sf::Keyboard::Left))  dx -= 1.0;
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::D) || sf::Keyboard::isKeyPressed(sf::Keyboard::Right)) dx += 1.0;
+        
+        // Передаем вектор направления в навигатор
+        navigator->setTargetVelocity(dx, dy);
 
         // ЛОГИКА 
         try {
@@ -65,8 +92,22 @@ void runSimulation() {
         // ИНТЕРФЕЙС ImGui
         ImGui::Begin("Simulation Controls");
         ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
+        ImGui::Separator();
+        
+        ImGui::Text("Физика эфира");
+        ImGui::SliderFloat("Мощность (TxPower)", &g_Settings.baseTxPower, 10000.0f, 500000.0f, "%.0f");
+        ImGui::SliderFloat("Шум среды (+/- %)", &g_Settings.noiseVariation, 0.0f, 0.5f, "%.2f");
+        ImGui::SliderFloat("Порог приема", &g_Settings.signalThreshold, 0.01f, 0.2f, "%.3f");
+        
+        ImGui::Separator();
+        ImGui::Text("Математика Навигации");
+        ImGui::SliderFloat("Сглаживание (Lerp)", &g_Settings.smoothing, 0.01f, 1.0f, "%.2f");
+        ImGui::SliderFloat("Градиентный шаг", &g_Settings.learningRate, 0.05f, 2.0f, "%.2f");
+        ImGui::SliderFloat("Аппаратная погрешность", &g_Settings.baseUncertainty, 0.0f, 50.0f, "%.1f");
+        ImGui::SliderFloat("Пропускаемость стены", &g_Settings.wallAttenuation, 0.05f, 1.0f, "%.2f");
+
+        ImGui::Separator();
         if (ImGui::Button("Regenerate Map")) {
-            std::cout << "[Debug] Map regeneration triggered.\n";
             environment->triggerLazyGeneration(Point2D{0, 0});
         }
         ImGui::End();
@@ -77,11 +118,8 @@ void runSimulation() {
         // TODO: MapRenderer.render(window, environment);
         // TODO: NavigationRenderer.render(window, navigator);
 
-        // Тестовая отрисовка искомого объекта (красный круг в центре)
-        sf::CircleShape targetShape(20.0f);
-        targetShape.setFillColor(sf::Color::Red);
-        targetShape.setPosition(380.0f, 280.0f);
-        window.draw(targetShape);
+        window.clear(sf::Color(30, 30, 30));
+        renderer.render(window, navigator, environment);
 
         ImGui::SFML::Render(window);
         window.display();

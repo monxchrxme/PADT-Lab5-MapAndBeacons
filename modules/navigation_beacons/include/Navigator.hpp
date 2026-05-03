@@ -27,10 +27,10 @@ public:
 
     // Методы для взаимодействия (UI и Управление)
 
-    void setTargetVelocity(double dx, double dy) {
+    void setTargetVelocity(double dx, double dy) override {
         if (target_) target_->setDirection(dx, dy);
     }
     // Геттеры для рендерера 
-    [[nodiscard]] const TargetObject* getTarget() const { return target_; }
-    [[nodiscard]] const Sequence<MobileBeacon*>& getBeacons() const { return beacons_; }
+    [[nodiscard]] const TargetObject* getTarget() const override { return target_; }
+    [[nodiscard]] const Sequence<MobileBeacon*>& getBeacons() const override { return beacons_; }
 };

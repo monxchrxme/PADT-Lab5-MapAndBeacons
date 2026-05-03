@@ -38,11 +38,14 @@ namespace math {
         return dist(gen);
     }
 
-    // Наивный перевод полученного радиосигнала в метры 
-    inline double rssiToDistance(double rssi) {
-    if (rssi <= 0.0) return 999999.0; // Сигнала нет, расстояние бесконечно
-    // Если сигнал падает пропорционально квадрату расстояния (1 / d^2)
-    // то расстояние = 1 / sqrt(rssi)
-    return 1.0 / std::sqrt(rssi); 
+    // Функция перевода RSSI в дистанцию
+    [[nodiscard]] inline double rssiToDistance(double rssi, double txPower) {
+    if (rssi <= 0.0001) return 99999.0; // Сигнала нет, расстояние бесконечно
+    return std::sqrt(txPower / rssi); 
     }   
+
+    // Линейная интерполяция (Lerp) для сглаживания значений
+    [[nodiscard]] inline double lerp(double start, double end, double t) {
+        return start + t * (end - start);
+    }
 }
