@@ -5,9 +5,9 @@
 #include <exception>
 
 #include "MockEnvironment.hpp"
-#include "MockNavigator.hpp"
 #include "exceptions/EnvironmentExceptions.hpp"
 #include "exceptions/NavigationExceptions.hpp"
+#include "Navigator.hpp"
 
 void runSimulation() {
     IEnvironment* environment = nullptr;
@@ -15,7 +15,7 @@ void runSimulation() {
 
     try {
         environment = new MockEnvironment();
-        navigator = new MockNavigator(environment);
+        navigator = new Navigator(environment);
     } catch (const std::exception& e) {
         std::cerr << "Initialization error: " << e.what() << '\n';
         delete navigator;
