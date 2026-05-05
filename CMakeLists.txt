@@ -64,6 +64,8 @@ set(BUILD_TESTING OFF CACHE BOOL "" FORCE)
 # Подключаем локальные библиотеки 
 add_subdirectory(external/googletest)
 add_subdirectory(external/sequence/src)
+set(SFML_BUILD_AUDIO FALSE CACHE BOOL "Disable Audio" FORCE)
+set(SFML_BUILD_NETWORK FALSE CACHE BOOL "Disable Network" FORCE)
 add_subdirectory(external/sfml)
 add_subdirectory(external/imgui_sfml)
 

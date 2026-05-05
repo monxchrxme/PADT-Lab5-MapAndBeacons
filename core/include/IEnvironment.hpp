@@ -1,6 +1,6 @@
 #pragma once
 #include "Structures.hpp"
-#include "sequences/mutable_array_sequence.hpp"
+#include "../../external/sequence/src/sequences/mutable_array_sequence.hpp"
 
 class IEnvironment {
 public:

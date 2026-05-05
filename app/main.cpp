@@ -4,7 +4,7 @@
 #include <iostream>
 #include <exception>
 
-#include "MockEnvironment.hpp"
+#include "EnvironmentManager.hpp"
 #include "exceptions/EnvironmentExceptions.hpp"
 #include "exceptions/NavigationExceptions.hpp"
 #include "Navigator.hpp"
@@ -15,7 +15,7 @@ void runSimulation() {
     INavigator* navigator = nullptr;
 
     try {
-        environment = new MockEnvironment();
+        environment = new EnvironmentManager();
         navigator = new Navigator(environment);
     } catch (const std::exception& e) {
         std::cerr << "Initialization error: " << e.what() << '\n';
