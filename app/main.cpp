@@ -29,7 +29,7 @@ void runSimulation() {
     settings.antialiasingLevel = 8;
     
     sf::RenderWindow window(sf::VideoMode(800, 600), "GeoLocation Simulation", sf::Style::Default, settings);
-    window.setFramerateLimit(60);
+    window.setFramerateLimit(90);
 
     if (!ImGui::SFML::Init(window)) {
         delete navigator;
