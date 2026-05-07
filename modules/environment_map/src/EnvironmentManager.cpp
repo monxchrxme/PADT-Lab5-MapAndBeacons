@@ -114,12 +114,25 @@ void EnvironmentManager::generateChunkData(Chunk* chunk) {
         }
     }
 
-    // 10% шанс спавна стационарной вышки прямо в центре чанка
-    if (hash2D(chunk->getX(), chunk->getY()) > 0.90) {
-        Point2D towerPos;
-        towerPos.x = chunk->getX() * Chunk::CHUNK_SIZE * Chunk::TILE_SIZE + (Chunk::CHUNK_SIZE * Chunk::TILE_SIZE / 2.0);
-        towerPos.y = chunk->getY() * Chunk::CHUNK_SIZE * Chunk::TILE_SIZE + (Chunk::CHUNK_SIZE * Chunk::TILE_SIZE / 2.0);
-        staticTowers.append(towerPos);
+    // 20% шанс спавна стационарной вышки прямо в центре чанка
+    if (hash2D(chunk->getX(), chunk->getY()) > 0.80) {
+        bool spawned = false;
+        // Пройдемся по тайлам чанка и найдем первую подходящую поляну
+        for (int y = 2; y < Chunk::CHUNK_SIZE - 2 && !spawned; ++y) {
+            for (int x = 2; x < Chunk::CHUNK_SIZE - 2 && !spawned; ++x) {
+                Tile t = chunk->getTile(x, y);
+                
+                // Ставим вышку только на пустом поле (EMPTY) или в лесу (FOREST)
+                if (t.isPassable) {
+                    Point2D towerPos;
+                    // Вычисляем глобальные координаты центра этого тайла
+                    towerPos.x = (chunk->getX() * Chunk::CHUNK_SIZE + x) * Chunk::TILE_SIZE + (Chunk::TILE_SIZE / 2.0);
+                    towerPos.y = (chunk->getY() * Chunk::CHUNK_SIZE + y) * Chunk::TILE_SIZE + (Chunk::TILE_SIZE / 2.0);
+                    staticTowers.append(towerPos);
+                    spawned = true;
+                }
+            }
+        }
     }
 }
 

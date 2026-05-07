@@ -35,4 +35,29 @@ void MapRenderer::render(sf::RenderWindow& window, const EnvironmentManager* env
             }
         }
     }
+// === 2. ОТРИСОВКА СТАЦИОНАРНЫХ ВЫШЕК ===
+    // Получаем массив вышек ПО ЗНАЧЕНИЮ (без звездочки)
+    auto towers = envManager->getStaticTowers();
+    
+    if (towers.get_length() > 0) {
+        sf::CircleShape towerBase(8.0f);
+        towerBase.setOrigin(8.0f, 8.0f);
+        towerBase.setFillColor(sf::Color(50, 205, 50)); 
+        towerBase.setOutlineThickness(2.0f);
+        towerBase.setOutlineColor(sf::Color::Black);
+
+        sf::CircleShape towerLight(3.0f);
+        towerLight.setOrigin(3.0f, 3.0f);
+        towerLight.setFillColor(sf::Color::Red);
+
+        for (int i = 0; i < towers.get_length(); ++i) {
+            Point2D pos = towers[i]; // Обращаемся напрямую к элементу
+
+            towerBase.setPosition(static_cast<float>(pos.x), static_cast<float>(pos.y));
+            window.draw(towerBase);
+
+            towerLight.setPosition(static_cast<float>(pos.x), static_cast<float>(pos.y));
+            window.draw(towerLight);
+        }
+    }
 }

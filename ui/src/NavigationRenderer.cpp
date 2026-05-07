@@ -7,13 +7,6 @@
 void NavigationRenderer::render(sf::RenderWindow& window, const INavigator* navigator, const IEnvironment* env) const {
     if (!navigator || !env) return;
 
-    // Отрисовка тестовой стены 
-    sf::RectangleShape wall(sf::Vector2f(40.0f, 200.0f));
-    wall.setPosition(380.0f, 200.0f);
-    wall.setFillColor(sf::Color(100, 100, 100)); 
-    window.draw(wall);
-
-
     // Отрисовка Стационарных Вышек (Фон)
     MutableArraySequence<Point2D> towers = env->getStaticTowers();
     sf::RectangleShape towerShape(sf::Vector2f(16.0f, 16.0f));
