@@ -1,38 +1,69 @@
-#include "Chunk.hpp"
+#include "../include/Chunk.hpp"
+#include "../../../core/include/exceptions/EnvironmentExceptions.hpp"
+#include <utility>
 
-Chunk::Chunk(int size, int offX, int offY) : chunkSize(size), offsetX(offX), offsetY(offY) {
-    // Ручное выделение памяти под 2D массив
-    grid = new TileType*[chunkSize];
-    for (int i = 0; i < chunkSize; ++i) {
-        grid[i] = new TileType[chunkSize];
-        for (int j = 0; j < chunkSize; ++j) {
-            grid[i][j] = TileType::Grass; // По умолчанию всё заливаем травой
-        }
-    }
+Chunk::Chunk(int x, int y) : chunkX(x), chunkY(y) {
+    tiles = new Tile[CHUNK_SIZE * CHUNK_SIZE];
 }
 
 Chunk::~Chunk() {
-    // Очистка памяти
-    for (int i = 0; i < chunkSize; ++i) {
-        delete[] grid[i];
-    }
-    delete[] grid;
+    delete[] tiles;
 }
 
-TileType Chunk::getTileLocal(int localX, int localY) const {
-    if (localX < 0 || localX >= chunkSize || localY < 0 || localY >= chunkSize) {
-        return TileType::Grass;
-    }
-    return grid[localX][localY];
-}
-
-void Chunk::setTileLocal(int localX, int localY, TileType type) {
-    if (localX >= 0 && localX < chunkSize && localY >= 0 && localY < chunkSize) {
-        grid[localX][localY] = type;
+Chunk::Chunk(const Chunk& other) : chunkX(other.chunkX), chunkY(other.chunkY) {
+    tiles = new Tile[CHUNK_SIZE * CHUNK_SIZE];
+    for (int i = 0; i < CHUNK_SIZE * CHUNK_SIZE; ++i) {
+        tiles[i] = other.tiles[i];
     }
 }
 
-bool Chunk::containsGlobal(int globalX, int globalY) const {
-    return globalX >= offsetX && globalX < offsetX + chunkSize &&
-           globalY >= offsetY && globalY < offsetY + chunkSize;
+Chunk& Chunk::operator=(const Chunk& other) {
+    if (this == &other) return *this;
+    Tile* newTiles = new Tile[CHUNK_SIZE * CHUNK_SIZE];
+    for (int i = 0; i < CHUNK_SIZE * CHUNK_SIZE; ++i) {
+        newTiles[i] = other.tiles[i];
+    }
+    delete[] tiles;
+    tiles = newTiles;
+    chunkX = other.chunkX;
+    chunkY = other.chunkY;
+    return *this;
+}
+
+Chunk::Chunk(Chunk&& other) noexcept : chunkX(other.chunkX), chunkY(other.chunkY), tiles(other.tiles) {
+    other.tiles = nullptr;
+}
+
+Chunk& Chunk::operator=(Chunk&& other) noexcept {
+    if (this == &other) return *this;
+    delete[] tiles;
+    tiles = other.tiles;
+    chunkX = other.chunkX;
+    chunkY = other.chunkY;
+    other.tiles = nullptr;
+    return *this;
+}
+
+Tile Chunk::getTile(int localX, int localY) const {
+    if (localX < 0 || localX >= CHUNK_SIZE || localY < 0 || localY >= CHUNK_SIZE) {
+        throw OutOfBoundsException("Chunk local coordinates out of bounds");
+    }
+    return tiles[localY * CHUNK_SIZE + localX];
+}
+
+void Chunk::setTile(int localX, int localY, TileType type) {
+    if (localX < 0 || localX >= CHUNK_SIZE || localY < 0 || localY >= CHUNK_SIZE) {
+        throw OutOfBoundsException("Chunk local coordinates out of bounds");
+    }
+    
+    Tile& tile = tiles[localY * CHUNK_SIZE + localX];
+    tile.type = type;
+    
+    // Настраиваем физику
+    switch (type) {
+        case TileType::EMPTY:  tile.isPassable = true;  tile.transmittance = 1.0; break;
+        case TileType::WATER:  tile.isPassable = false; tile.transmittance = 1.0; break;
+        case TileType::FOREST: tile.isPassable = true;  tile.transmittance = 0.7; break;
+        case TileType::WALL:   tile.isPassable = false; tile.transmittance = 0.1; break;
+    }
 }

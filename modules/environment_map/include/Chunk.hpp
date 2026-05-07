@@ -1,34 +1,42 @@
 #pragma once
-#include "../../../core/include/Structures.hpp"
+#include "../../../core/include/Structures.hpp" // Тут должен быть struct Point2D { double x; double y; };
 
 enum class TileType {
-    Grass,      // Идеальный сигнал, проходимо
-    Forest,     // Сигнал глушится слабо, проходимо
-    Water,      // Идеальный сигнал, НЕпроходимо
-    Concrete    // Сигнал глушится сильно, НЕпроходимо
+    EMPTY,    // Трава
+    FOREST,   // Лес
+    WATER,    // Вода
+    WALL      // Бетонная стена
+};
+
+struct Tile {
+    TileType type = TileType::EMPTY;
+    bool isPassable = true;
+    double transmittance = 1.0; // Коэффициент пропускания радиосигнала (0.0 - 1.0)
 };
 
 class Chunk {
+public:
+    static constexpr int CHUNK_SIZE = 16;
+    static constexpr double TILE_SIZE = 50.0; // Размер одного тайла в метрах/пикселях
+
 private:
-    int chunkSize;
-    TileType** grid; 
-    int offsetX;     // Смещение чанка по X (в тайлах)
-    int offsetY;     // Смещение чанка по Y (в тайлах)
+    int chunkX;
+    int chunkY;
+    Tile* tiles; // Владеющий сырой указатель на массив 16x16
 
 public:
-    Chunk(int size, int offX, int offY);
+    Chunk(int x, int y);
     ~Chunk();
 
-    // Запрещаем копирование (ручное управление памятью)
-    Chunk(const Chunk&) = delete;
-    Chunk& operator=(const Chunk&) = delete;
+    // Правило пяти: защищаем ручную память от утечек
+    Chunk(const Chunk& other);
+    Chunk& operator=(const Chunk& other);
+    Chunk(Chunk&& other) noexcept;
+    Chunk& operator=(Chunk&& other) noexcept;
 
-    TileType getTileLocal(int localX, int localY) const;
-    void setTileLocal(int localX, int localY, TileType type);
+    [[nodiscard]] int getX() const noexcept { return chunkX; }
+    [[nodiscard]] int getY() const noexcept { return chunkY; }
     
-    int getOffsetX() const { return offsetX; }
-    int getOffsetY() const { return offsetY; }
-    int getSize() const { return chunkSize; }
-    
-    bool containsGlobal(int globalX, int globalY) const;
+    [[nodiscard]] Tile getTile(int localX, int localY) const;
+    void setTile(int localX, int localY, TileType type);
 };

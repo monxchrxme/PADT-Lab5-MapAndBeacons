@@ -1,24 +1,34 @@
 #pragma once
-#include "../../../core/include/IEnvironment.hpp" 
-#include "Chunk.hpp"
+#include "../../../core/include/IEnvironment.hpp"
 #include "../../../external/sequence/src/sequences/mutable_array_sequence.hpp"
+#include "Chunk.hpp"
 
-class EnvironmentManager : public IEnvironment {
+class EnvironmentManager final : public IEnvironment {
 private:
-    MutableArraySequence<Chunk*> chunks; 
+    MutableArraySequence<Chunk*> activeChunks;
     MutableArraySequence<Point2D> staticTowers;
-    const int CHUNK_SIZE = 16;
 
-    Chunk* getChunkAt(int globalX, int globalY) const;
-    void generateChunk(int chunkX, int chunkY);
+    [[nodiscard]] Chunk* getChunkAt(int chunkX, int chunkY) const;
+    [[nodiscard]] Tile getTileAtWorldPos(Point2D p) const;
+    void generateChunkData(Chunk* chunk);
 
 public:
-    EnvironmentManager();
+    EnvironmentManager() = default;
     ~EnvironmentManager() override;
 
+    // Запрет копирования - мы владеем сырыми указателями на чанки
+    EnvironmentManager(const EnvironmentManager&) = delete;
+    EnvironmentManager& operator=(const EnvironmentManager&) = delete;
+
     // Реализация интерфейса IEnvironment
-    bool isPassable(Point2D point) const override;
-    double calculateSignal(Point2D a, Point2D b) const override;
-    MutableArraySequence<Point2D> getStaticTowers() const override;
+    [[nodiscard]] bool isPassable(Point2D p) const override;
+    [[nodiscard]] double calculateSignal(Point2D a, Point2D b) const override;
     void triggerLazyGeneration(Point2D p) override;
+    
+    [[nodiscard]] MutableArraySequence<Point2D> getStaticTowers() const override; 
+
+    // Экспортируем чанки ТОЛЬКО для рендерера
+    [[nodiscard]] const MutableArraySequence<Chunk*>& getActiveChunks() const noexcept {
+        return activeChunks;
+    }
 };

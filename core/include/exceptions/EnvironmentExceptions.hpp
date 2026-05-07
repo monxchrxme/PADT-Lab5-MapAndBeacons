@@ -1,22 +1,27 @@
 #pragma once
-#include <stdexcept>
+#include <exception>
 #include <string>
 
-// Базовый класс для всех ошибок карты
-class EnvironmentException : public std::runtime_error {
+class EnvironmentException : public std::exception {
+protected:
+    std::string message;
 public:
-    explicit EnvironmentException(const std::string& message) 
-        : std::runtime_error(message) {}
+    explicit EnvironmentException(const char* msg) : message(msg) {}
+    explicit EnvironmentException(const std::string& msg) : message(msg) {}
+    
+    [[nodiscard]] const char* what() const noexcept override {
+        return message.c_str();
+    }
 };
 
-class ChunkGenerationException final : public EnvironmentException {
+class OutOfBoundsException : public EnvironmentException {
 public:
-    ChunkGenerationException() 
-        : EnvironmentException("Environment error: failed to generate map chunk.") {}
+    explicit OutOfBoundsException(const char* msg = "Coordinates out of bounds") 
+        : EnvironmentException(msg) {}
 };
 
-class InvalidCoordinateException final : public EnvironmentException {
+class ChunkGenerationException : public EnvironmentException {
 public:
-    InvalidCoordinateException() 
-        : EnvironmentException("Environment error: requested coordinates are out of valid bounds.") {}
+    explicit ChunkGenerationException(const char* msg = "Failed to generate map chunk") 
+        : EnvironmentException(msg) {}
 };
