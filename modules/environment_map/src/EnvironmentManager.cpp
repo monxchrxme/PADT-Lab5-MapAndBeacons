@@ -3,7 +3,6 @@
 #include <cmath>
 #include <cstdint>
 
-// --- ПРОЦЕДУРНАЯ ГЕНЕРАЦИЯ ШУМА (Локальные математические функции) ---
 
 // Простой хэш для координат
 static double hash2D(int x, int y) {
@@ -30,7 +29,7 @@ static double smoothNoise(double x, double y) {
     return a*(1.0-u)*(1.0-v) + b*u*(1.0-v) + c*(1.0-u)*v + d*u*v;
 }
 
-// --- РЕАЛИЗАЦИЯ КЛАССА ENVIRONMENT MANAGER ---
+// РЕАЛИЗАЦИЯ КЛАССА ENVIRONMENT MANAGER
 
 EnvironmentManager::~EnvironmentManager() {
     // Безопасно очищаем все чанки, чтобы избежать утечек
@@ -92,44 +91,92 @@ void EnvironmentManager::triggerLazyGeneration(Point2D p) {
 }
 
 void EnvironmentManager::generateChunkData(Chunk* chunk) {
-    double scale = 0.08; // Масштаб биомов
+    double scaleNature = 0.10; // Изменили масштаб для более округлых форм
+    double scalePath = 0.05;   
 
+    // Природа (Круглые Озера, Леса и Тропинки)
     for (int y = 0; y < Chunk::CHUNK_SIZE; ++y) {
         for (int x = 0; x < Chunk::CHUNK_SIZE; ++x) {
             double globalX = chunk->getX() * Chunk::CHUNK_SIZE + x;
             double globalY = chunk->getY() * Chunk::CHUNK_SIZE + y;
 
-            double noise = smoothNoise(globalX * scale, globalY * scale);
+            double noiseNature = smoothNoise(globalX * scaleNature, globalY * scaleNature);
+            double noisePath = smoothNoise(globalX * scalePath + 100.0, globalY * scalePath + 100.0);
 
             TileType type = TileType::EMPTY;
-            if (noise < 0.20) type = TileType::WATER;
-            else if (noise > 0.60) type = TileType::FOREST;
-            
-            // Жесткий белый шум для редких бетонных стен
-            if (type != TileType::WATER && hash2D(static_cast<int>(globalX), static_cast<int>(globalY)) > 0.98) {
-                type = TileType::WALL; 
+
+            // Воды стало меньше (< 0.15), и она будет более круглой
+            if (noiseNature < 0.15) {
+                type = TileType::WATER;
+            } else if (noiseNature > 0.65) {
+                type = TileType::FOREST;
+            }
+
+            // Тропинки
+            if (type != TileType::WATER) {
+                if (std::abs(noisePath - 0.5) < 0.04) {
+                    type = TileType::PATH;
+                }
             }
             
             chunk->setTile(x, y, type);
         }
     }
 
-    // 20% шанс спавна стационарной вышки прямо в центре чанка
-    if (hash2D(chunk->getX(), chunk->getY()) > 0.80) {
-        bool spawned = false;
-        // Пройдемся по тайлам чанка и найдем первую подходящую поляну
-        for (int y = 2; y < Chunk::CHUNK_SIZE - 2 && !spawned; ++y) {
-            for (int x = 2; x < Chunk::CHUNK_SIZE - 2 && !spawned; ++x) {
-                Tile t = chunk->getTile(x, y);
-                
-                // Ставим вышку только на пустом поле (EMPTY) или в лесу (FOREST)
-                if (t.isPassable) {
+    // Здания разной формы
+    for (int y = 2; y < Chunk::CHUNK_SIZE - 4; ++y) {
+        for (int x = 2; x < Chunk::CHUNK_SIZE - 4; ++x) {
+            double globalX = chunk->getX() * Chunk::CHUNK_SIZE + x;
+            double globalY = chunk->getY() * Chunk::CHUNK_SIZE + y;
+
+            if (hash2D(static_cast<int>(globalX), static_cast<int>(globalY)) > 0.99) {
+                bool safeToBuild = true;
+                for(int dy = -1; dy <= 3; dy++) {
+                    for(int dx = -1; dx <= 3; dx++) {
+                        TileType t = chunk->getTile(x + dx, y + dy).type;
+                        if(t == TileType::WATER || t == TileType::PATH) safeToBuild = false;
+                    }
+                }
+
+                if (safeToBuild) {
+                    int shapeType = static_cast<int>(hash2D(globalX*2, globalY*2) * 100) % 4;
+                    chunk->setTile(x, y, TileType::WALL);
+                    chunk->setTile(x+1, y, TileType::WALL);
+
+                    if (shapeType == 0) {
+                        chunk->setTile(x, y+1, TileType::WALL);
+                        chunk->setTile(x+1, y+1, TileType::WALL);
+                    } else if (shapeType == 1) {
+                        chunk->setTile(x+2, y, TileType::WALL);
+                    } else if (shapeType == 2) {
+                        chunk->setTile(x, y+1, TileType::WALL);
+                        chunk->setTile(x, y+2, TileType::WALL);
+                    } else if (shapeType == 3) {
+                        chunk->setTile(x+2, y, TileType::WALL);
+                        chunk->setTile(x+1, y+1, TileType::WALL);
+                        chunk->setTile(x+1, y+2, TileType::WALL);
+                    }
+                }
+            }
+        }
+    }
+
+    // Гарантированная вышка 
+    bool spawned = false;
+    for (int y = 2; y < Chunk::CHUNK_SIZE - 2 && !spawned; ++y) {
+        for (int x = 2; x < Chunk::CHUNK_SIZE - 2 && !spawned; ++x) {
+            Tile t = chunk->getTile(x, y);
+            
+            if (t.type == TileType::EMPTY || t.type == TileType::PATH) {
+                if (staticTowers.get_length() < 3 || hash2D(chunk->getX()+x, chunk->getY()+y) > 0.95) {
                     Point2D towerPos;
-                    // Вычисляем глобальные координаты центра этого тайла
                     towerPos.x = (chunk->getX() * Chunk::CHUNK_SIZE + x) * Chunk::TILE_SIZE + (Chunk::TILE_SIZE / 2.0);
                     towerPos.y = (chunk->getY() * Chunk::CHUNK_SIZE + y) * Chunk::TILE_SIZE + (Chunk::TILE_SIZE / 2.0);
+                    
                     staticTowers.append(towerPos);
-                    spawned = true;
+                    chunk->setTile(x, y, TileType::TOWER_BASE); 
+                    
+                    spawned = true; 
                 }
             }
         }
@@ -141,13 +188,13 @@ MutableArraySequence<Point2D> EnvironmentManager::getStaticTowers() const {
 }
 
 double EnvironmentManager::calculateSignal(Point2D a, Point2D b) const {
-    // 1. Считаем идеальный физический сигнал в вакууме
+    // Считаем идеальный физический сигнал в вакууме
     double distanceSq = (b.x - a.x) * (b.x - a.x) + (b.y - a.y) * (b.y - a.y);
     if (distanceSq < 1.0) distanceSq = 1.0; 
     
     double baseSignal = 100000.0 / distanceSq; // Базовая мощность вышки
 
-    // 2. Считаем затухание от тайлов (Raycasting Брезенхема)
+    // Считаем затухание от тайлов (Raycasting Брезенхема)
     double totalTransmittance = 1.0; 
     
     int x0 = static_cast<int>(std::floor(a.x / Chunk::TILE_SIZE));
@@ -179,6 +226,6 @@ double EnvironmentManager::calculateSignal(Point2D a, Point2D b) const {
         if (e2 <= dx) { err += dx; y0 += sy; }
     }
 
-    // 3. Возвращаем искаженный физический сигнал
+    // Возвращаем искаженный физический сигнал
     return baseSignal * totalTransmittance; 
 }

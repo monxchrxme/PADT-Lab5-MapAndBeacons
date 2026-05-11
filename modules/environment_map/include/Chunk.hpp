@@ -5,7 +5,9 @@ enum class TileType {
     EMPTY,    // Трава
     FOREST,   // Лес
     WATER,    // Вода
-    WALL      // Бетонная стена
+    WALL,      // Бетонная стена
+    PATH,      // Грунтовая тропинка 
+    TOWER_BASE   // Непроходимый фундамент вышки
 };
 
 struct Tile {

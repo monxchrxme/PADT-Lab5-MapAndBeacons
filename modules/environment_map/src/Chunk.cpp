@@ -65,5 +65,7 @@ void Chunk::setTile(int localX, int localY, TileType type) {
         case TileType::WATER:  tile.isPassable = false; tile.transmittance = 1.0; break;
         case TileType::FOREST: tile.isPassable = true;  tile.transmittance = 0.7; break;
         case TileType::WALL:   tile.isPassable = false; tile.transmittance = 0.1; break;
+        case TileType::PATH:   tile.isPassable = true;  tile.transmittance = 1.0; break;
+        case TileType::TOWER_BASE: tile.isPassable = false; tile.transmittance = 0.5; break;
     }
 }

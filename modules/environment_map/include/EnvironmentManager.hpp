@@ -27,7 +27,7 @@ public:
     
     [[nodiscard]] MutableArraySequence<Point2D> getStaticTowers() const override; 
 
-    // Экспортируем чанки ТОЛЬКО для рендерера
+    // Экспортируем чанки только для рендерера
     [[nodiscard]] const MutableArraySequence<Chunk*>& getActiveChunks() const noexcept {
         return activeChunks;
     }

@@ -1,24 +1,16 @@
-# Это графический модуль. Он знает про SFML и про оба логических модуля.
-
+# Собираем все .cpp файлы модуля UI
 file(GLOB SOURCES "src/*.cpp")
 
-add_library(ui STATIC ${SOURCES}
-        include/NavigationRenderer.hpp
-        src/NavigationRenderer.cpp)
+add_library(ui STATIC ${SOURCES})
 
-target_include_directories(ui PUBLIC 
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${CMAKE_SOURCE_DIR}/external/sfml/include 
-)
+# Публичные заголовки
+target_include_directories(ui PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-# Здесь происходит магия объединения: UI зависит от карты, навигации и SFML.
-# SFML состоит из нескольких модулей. Нам нужны графика, окно и система.
+# САМОЕ ГЛАВНОЕ: говорим модулю UI, что ему нужен SFML и твоя карта
 target_link_libraries(ui PUBLIC 
-        core
-        environment_map
-        navigation_beacons
-        sfml-graphics
-        sfml-window
-        sfml-system
-        ImGui-SFML::ImGui-SFML # Подключаем графику и ImGui-SFML
+    environment_map 
+    navigation_beacons 
+    sfml-graphics 
+    sfml-window 
+    sfml-system
 )
