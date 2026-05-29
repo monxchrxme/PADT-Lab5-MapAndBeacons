@@ -60,6 +60,8 @@ void runSimulation() {
     NavigationRenderer renderer;
     MapRenderer mapRenderer; 
 
+    float currentZoom = 1.0f; //стандартный масштаб
+
     // Главный цикл
     while (window.isOpen()) {
         sf::Event event{};
@@ -67,6 +69,15 @@ void runSimulation() {
             ImGui::SFML::ProcessEvent(window, event);
             if (event.type == sf::Event::Closed) {
                 window.close();
+            }
+            if (event.type == sf::Event::MouseWheelScrolled && !ImGui::GetIO().WantCaptureMouse) {
+                if (event.mouseWheelScroll.delta > 0) {
+                    currentZoom *= 0.8f; // Крутим вверх -> Приближаем
+                } else {
+                    currentZoom *= 1.2f; // Крутим вниз -> Отдаляем
+                }
+                // Ограничиваем зум (от х0.2 до х3.0)
+                currentZoom = std::clamp(currentZoom, 0.2f, 3.0f);
             }
         }
 
@@ -126,6 +137,7 @@ void runSimulation() {
         // Настраиваем камеру на объект
         if (navigator->getTarget()) {
             sf::View view = window.getDefaultView(); // Берем стандартный размер
+            view.zoom(currentZoom);
             Point2D pos = navigator->getTarget()->getRealPosition();
             // Центрируем камеру точно на красной точке!
             view.setCenter(static_cast<float>(pos.x), static_cast<float>(pos.y));

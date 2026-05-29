@@ -51,21 +51,29 @@ Tile Chunk::getTile(int localX, int localY) const {
     return tiles[localY * CHUNK_SIZE + localX];
 }
 
-void Chunk::setTile(int localX, int localY, TileType type) {
+void Chunk::setTile(int localX, int localY, TileType type, int height) {
     if (localX < 0 || localX >= CHUNK_SIZE || localY < 0 || localY >= CHUNK_SIZE) {
         throw OutOfBoundsException("Chunk local coordinates out of bounds");
     }
     
     Tile& tile = tiles[localY * CHUNK_SIZE + localX];
     tile.type = type;
+    tile.height = height; 
     
-    // Настраиваем физику
     switch (type) {
         case TileType::EMPTY:  tile.isPassable = true;  tile.transmittance = 1.0; break;
         case TileType::WATER:  tile.isPassable = false; tile.transmittance = 1.0; break;
-        case TileType::FOREST: tile.isPassable = true;  tile.transmittance = 0.7; break;
-        case TileType::WALL:   tile.isPassable = false; tile.transmittance = 0.1; break;
         case TileType::PATH:   tile.isPassable = true;  tile.transmittance = 1.0; break;
+        case TileType::WALL:   tile.isPassable = false; tile.transmittance = 0.1; break; 
         case TileType::TOWER_BASE: tile.isPassable = false; tile.transmittance = 0.5; break;
+        
+        case TileType::FOREST: 
+            tile.isPassable = true;
+            // ФИЗИКА ГУСТОТЫ ЛЕСА:
+            if (height == 1) tile.transmittance = 0.8;      // Редкий лес
+            else if (height == 2) tile.transmittance = 0.5; // Обычный лес 
+            else if (height == 3) tile.transmittance = 0.2; // Густая чаща 
+            else tile.transmittance = 0.6;
+            break;
     }
 }

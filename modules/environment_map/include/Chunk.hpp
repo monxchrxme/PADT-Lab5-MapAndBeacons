@@ -1,36 +1,36 @@
 #pragma once
-#include "../../../core/include/Structures.hpp" // Тут должен быть struct Point2D { double x; double y; };
+#include "../../../core/include/Structures.hpp" 
 
 enum class TileType {
-    EMPTY,    // Трава
-    FOREST,   // Лес
-    WATER,    // Вода
-    WALL,      // Бетонная стена
-    PATH,      // Грунтовая тропинка 
-    TOWER_BASE   // Непроходимый фундамент вышки
+    EMPTY,    
+    FOREST,   
+    WATER,    
+    WALL,      
+    PATH,       
+    TOWER_BASE   
 };
 
 struct Tile {
     TileType type = TileType::EMPTY;
     bool isPassable = true;
-    double transmittance = 1.0; // Коэффициент пропускания радиосигнала (0.0 - 1.0)
+    double transmittance = 1.0; 
+    int height = 0; // Для дома это высота, для леса - густота
 };
 
 class Chunk {
 public:
-    static constexpr int CHUNK_SIZE = 16;
-    static constexpr double TILE_SIZE = 50.0; // Размер одного тайла в метрах/пикселях
+    static constexpr int CHUNK_SIZE = 32;
+    static constexpr double TILE_SIZE = 25.0;
 
 private:
     int chunkX;
     int chunkY;
-    Tile* tiles; // Владеющий сырой указатель на массив 16x16
+    Tile* tiles;
 
 public:
     Chunk(int x, int y);
     ~Chunk();
 
-    // Правило пяти: защищаем ручную память от утечек
     Chunk(const Chunk& other);
     Chunk& operator=(const Chunk& other);
     Chunk(Chunk&& other) noexcept;
@@ -40,5 +40,5 @@ public:
     [[nodiscard]] int getY() const noexcept { return chunkY; }
     
     [[nodiscard]] Tile getTile(int localX, int localY) const;
-    void setTile(int localX, int localY, TileType type);
+    void setTile(int localX, int localY, TileType type, int height = 0);
 };

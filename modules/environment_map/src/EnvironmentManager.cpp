@@ -3,36 +3,44 @@
 #include <cmath>
 #include <cstdint>
 
+class PerlinNoise {
+private:
+    static float fade(float t) { return t * t * t * (t * (t * 6 - 15) + 10); }
+    static float lerp(float t, float a, float b) { return a + t * (b - a); }
+    static float grad(int hash, float x, float y) {
+        int h = hash & 3;
+        float u = h < 2 ? x : y;
+        float v = h < 2 ? y : x;
+        return ((h & 1) ? -u : u) + ((h & 2) ? -2.0f * v : 2.0f * v);
+    }
+public:
+    static int hash(int x, int y) {
+        uint32_t a = static_cast<uint32_t>(x * 3284157443 ^ y * 19349663);
+        a ^= a << 13; a ^= a >> 17; a ^= a << 5;
+        return a & 255;
+    }
+    static double noise(double x, double y) {
+        int X = static_cast<int>(std::floor(x)) & 255;
+        int Y = static_cast<int>(std::floor(y)) & 255;
+        x -= std::floor(x);
+        y -= std::floor(y);
+        float u = fade(x);
+        float v = fade(y);
+        int A = hash(X, Y), B = hash(X + 1, Y);
+        int C = hash(X, Y + 1), D = hash(X + 1, Y + 1);
+        return lerp(v, lerp(u, grad(A, x, y), grad(B, x - 1, y)),
+                       lerp(u, grad(C, x, y - 1), grad(D, x - 1, y - 1)));
+    }
+    static double get(double x, double y) {
+        return (noise(x, y) + 1.0) / 2.0;
+    }
+    static double randomPos(double x, double y) {
+        return static_cast<double>(hash(static_cast<int>(x), static_cast<int>(y))) / 255.0;
+    }
+};
 
-// Простой хэш для координат
-static double hash2D(int x, int y) {
-    uint32_t a = static_cast<uint32_t>(x * 3284157443 ^ y * 19349663 + 719323);
-    a ^= a << 13; a ^= a >> 17; a ^= a << 5;
-    return static_cast<double>(a) / 4294967295.0;
-}
-
-// Плавный шум (Value Noise + Smoothstep) для генерации лесов и озер
-static double smoothNoise(double x, double y) {
-    int xi = static_cast<int>(std::floor(x));
-    int yi = static_cast<int>(std::floor(y));
-    double tx = x - xi;
-    double ty = y - yi;
-    
-    double u = tx * tx * (3.0 - 2.0 * tx);
-    double v = ty * ty * (3.0 - 2.0 * ty);
-
-    double a = hash2D(xi, yi);
-    double b = hash2D(xi + 1, yi);
-    double c = hash2D(xi, yi + 1);
-    double d = hash2D(xi + 1, yi + 1);
-
-    return a*(1.0-u)*(1.0-v) + b*u*(1.0-v) + c*(1.0-u)*v + d*u*v;
-}
-
-// РЕАЛИЗАЦИЯ КЛАССА ENVIRONMENT MANAGER
-
+//РЕАЛИЗАЦИЯ КЛАССА ENVIRONMENT MANAGER
 EnvironmentManager::~EnvironmentManager() {
-    // Безопасно очищаем все чанки, чтобы избежать утечек
     for (int i = 0; i < activeChunks.get_length(); ++i) {
         delete activeChunks[i];
     }
@@ -52,7 +60,7 @@ Tile EnvironmentManager::getTileAtWorldPos(Point2D p) const {
 
     Chunk* chunk = getChunkAt(chunkX, chunkY);
     if (!chunk) {
-        Tile emptyTile; // Если чанк не подгружен, возвращаем пустоту
+        Tile emptyTile; 
         return emptyTile;
     }
 
@@ -75,7 +83,6 @@ void EnvironmentManager::triggerLazyGeneration(Point2D p) {
     int chunkX = static_cast<int>(std::floor(p.x / (Chunk::CHUNK_SIZE * Chunk::TILE_SIZE)));
     int chunkY = static_cast<int>(std::floor(p.y / (Chunk::CHUNK_SIZE * Chunk::TILE_SIZE)));
 
-    // Генерируем чанк, в котором стоит объект, и 8 соседей вокруг (радиус 1)
     for (int dx = -1; dx <= 1; ++dx) {
         for (int dy = -1; dy <= 1; ++dy) {
             int cx = chunkX + dx;
@@ -91,92 +98,113 @@ void EnvironmentManager::triggerLazyGeneration(Point2D p) {
 }
 
 void EnvironmentManager::generateChunkData(Chunk* chunk) {
-    double scaleNature = 0.10; // Изменили масштаб для более округлых форм
-    double scalePath = 0.05;   
+    double scaleNature = 0.03; 
+    double scalePath = 0.015;   
 
-    // Природа (Круглые Озера, Леса и Тропинки)
+    //Природа (озера, леса разной густоты)
     for (int y = 0; y < Chunk::CHUNK_SIZE; ++y) {
         for (int x = 0; x < Chunk::CHUNK_SIZE; ++x) {
             double globalX = chunk->getX() * Chunk::CHUNK_SIZE + x;
             double globalY = chunk->getY() * Chunk::CHUNK_SIZE + y;
 
-            double noiseNature = smoothNoise(globalX * scaleNature, globalY * scaleNature);
-            double noisePath = smoothNoise(globalX * scalePath + 100.0, globalY * scalePath + 100.0);
+            double noiseNature = PerlinNoise::get(globalX * scaleNature, globalY * scaleNature);
+            double noisePath = PerlinNoise::get(globalX * scalePath + 100.0, globalY * scalePath + 100.0);
 
             TileType type = TileType::EMPTY;
+            int param = 0;
 
-            // Воды стало меньше (< 0.15), и она будет более круглой
-            if (noiseNature < 0.15) {
+            if (noiseNature < 0.35) { 
                 type = TileType::WATER;
-            } else if (noiseNature > 0.65) {
+            } else if (noiseNature > 0.55) { 
                 type = TileType::FOREST;
+                if (noiseNature > 0.75) param = 3;      
+                else if (noiseNature > 0.65) param = 2; 
+                else param = 1;                         
             }
 
-            // Тропинки
             if (type != TileType::WATER) {
-                if (std::abs(noisePath - 0.5) < 0.04) {
-                    type = TileType::PATH;
-                }
+                if (std::abs(noisePath - 0.5) < 0.015) type = TileType::PATH; //Тонкие тропинки
             }
             
-            chunk->setTile(x, y, type);
+            chunk->setTile(x, y, type, param);
         }
     }
 
-    // Здания разной формы
-    for (int y = 2; y < Chunk::CHUNK_SIZE - 4; ++y) {
-        for (int x = 2; x < Chunk::CHUNK_SIZE - 4; ++x) {
+    //Здания 
+    for (int y = 3; y < Chunk::CHUNK_SIZE - 5; ++y) {
+        for (int x = 3; x < Chunk::CHUNK_SIZE - 5; ++x) {
             double globalX = chunk->getX() * Chunk::CHUNK_SIZE + x;
             double globalY = chunk->getY() * Chunk::CHUNK_SIZE + y;
 
-            if (hash2D(static_cast<int>(globalX), static_cast<int>(globalY)) > 0.99) {
+            if (PerlinNoise::randomPos(globalX, globalY) > 0.99) {
+                
+                //Проверяем огромный радиус вокруг (чтобы дома не слипались)
                 bool safeToBuild = true;
-                for(int dy = -1; dy <= 3; dy++) {
-                    for(int dx = -1; dx <= 3; dx++) {
+                for(int dy = -3; dy <= 4; dy++) {
+                    for(int dx = -3; dx <= 4; dx++) {
                         TileType t = chunk->getTile(x + dx, y + dy).type;
-                        if(t == TileType::WATER || t == TileType::PATH) safeToBuild = false;
+                        if(t == TileType::WATER || t == TileType::PATH || t == TileType::WALL) {
+                            safeToBuild = false; // Рядом вода, дорога или другой дом!
+                        }
                     }
                 }
-
                 if (safeToBuild) {
-                    int shapeType = static_cast<int>(hash2D(globalX*2, globalY*2) * 100) % 4;
-                    chunk->setTile(x, y, TileType::WALL);
-                    chunk->setTile(x+1, y, TileType::WALL);
+                    int h = (PerlinNoise::hash(static_cast<int>(globalX), static_cast<int>(globalY)) % 6) + 1;
+                    int shapeType = PerlinNoise::hash(static_cast<int>(globalX*2), static_cast<int>(globalY*2)) % 4;
 
-                    if (shapeType == 0) {
-                        chunk->setTile(x, y+1, TileType::WALL);
-                        chunk->setTile(x+1, y+1, TileType::WALL);
-                    } else if (shapeType == 1) {
-                        chunk->setTile(x+2, y, TileType::WALL);
-                    } else if (shapeType == 2) {
-                        chunk->setTile(x, y+1, TileType::WALL);
-                        chunk->setTile(x, y+2, TileType::WALL);
-                    } else if (shapeType == 3) {
-                        chunk->setTile(x+2, y, TileType::WALL);
-                        chunk->setTile(x+1, y+1, TileType::WALL);
-                        chunk->setTile(x+1, y+2, TileType::WALL);
+                    // Базовый блок (2x1 тайла)
+                    chunk->setTile(x, y, TileType::WALL, h);
+                    chunk->setTile(x+1, y, TileType::WALL, h);
+
+                    if (shapeType == 0) { // Квадрат 2x2
+                        chunk->setTile(x, y+1, TileType::WALL, h);
+                        chunk->setTile(x+1, y+1, TileType::WALL, h);
+                    } else if (shapeType == 1) { // Длинный прямоугольник 3x1
+                        chunk->setTile(x+2, y, TileType::WALL, h);
+                    } else if (shapeType == 2) { // Г-образный (L-shape)
+                        chunk->setTile(x, y+1, TileType::WALL, h);
+                        chunk->setTile(x, y+2, TileType::WALL, h);
+                    } else if (shapeType == 3) { // Т-образный (T-shape)
+                        chunk->setTile(x+2, y, TileType::WALL, h);
+                        chunk->setTile(x+1, y+1, TileType::WALL, h);
+                        chunk->setTile(x+1, y+2, TileType::WALL, h);
                     }
                 }
             }
         }
     }
 
-    // Гарантированная вышка 
+    //Гарантированная вышка
     bool spawned = false;
-    for (int y = 2; y < Chunk::CHUNK_SIZE - 2 && !spawned; ++y) {
-        for (int x = 2; x < Chunk::CHUNK_SIZE - 2 && !spawned; ++x) {
+    for (int y = 2; y < Chunk::CHUNK_SIZE - 3 && !spawned; ++y) {
+        for (int x = 2; x < Chunk::CHUNK_SIZE - 3 && !spawned; ++x) {
             Tile t = chunk->getTile(x, y);
             
             if (t.type == TileType::EMPTY || t.type == TileType::PATH) {
-                if (staticTowers.get_length() < 3 || hash2D(chunk->getX()+x, chunk->getY()+y) > 0.95) {
-                    Point2D towerPos;
-                    towerPos.x = (chunk->getX() * Chunk::CHUNK_SIZE + x) * Chunk::TILE_SIZE + (Chunk::TILE_SIZE / 2.0);
-                    towerPos.y = (chunk->getY() * Chunk::CHUNK_SIZE + y) * Chunk::TILE_SIZE + (Chunk::TILE_SIZE / 2.0);
-                    
-                    staticTowers.append(towerPos);
-                    chunk->setTile(x, y, TileType::TOWER_BASE); 
-                    
-                    spawned = true; 
+                bool noWallsAround = true;
+                for (int dy = -2; dy <= 3; ++dy) {
+                    for (int dx = -2; dx <= 3; ++dx) {
+                        if (chunk->getTile(x + dx, y + dy).type == TileType::WALL) noWallsAround = false;
+                    }
+                }
+
+                if (noWallsAround) {
+                    if (staticTowers.get_length() < 3 || PerlinNoise::randomPos(chunk->getX()+x, chunk->getY()+y) > 0.98) {
+                        Point2D towerPos;
+                        //Центрируем вышку ровно по тайлам
+                        towerPos.x = (chunk->getX() * Chunk::CHUNK_SIZE + x) * Chunk::TILE_SIZE + Chunk::TILE_SIZE;
+                        towerPos.y = (chunk->getY() * Chunk::CHUNK_SIZE + y) * Chunk::TILE_SIZE + Chunk::TILE_SIZE;
+                        
+                        staticTowers.append(towerPos);
+                        
+                        //Фундамент под вышкой 2x2 мелких тайла
+                        chunk->setTile(x, y, TileType::TOWER_BASE, 0); 
+                        chunk->setTile(x+1, y, TileType::TOWER_BASE, 0); 
+                        chunk->setTile(x, y+1, TileType::TOWER_BASE, 0); 
+                        chunk->setTile(x+1, y+1, TileType::TOWER_BASE, 0); 
+                        
+                        spawned = true; 
+                    }
                 }
             }
         }
@@ -188,13 +216,10 @@ MutableArraySequence<Point2D> EnvironmentManager::getStaticTowers() const {
 }
 
 double EnvironmentManager::calculateSignal(Point2D a, Point2D b) const {
-    // Считаем идеальный физический сигнал в вакууме
     double distanceSq = (b.x - a.x) * (b.x - a.x) + (b.y - a.y) * (b.y - a.y);
     if (distanceSq < 1.0) distanceSq = 1.0; 
     
-    double baseSignal = 100000.0 / distanceSq; // Базовая мощность вышки
-
-    // Считаем затухание от тайлов (Raycasting Брезенхема)
+    double baseSignal = 100000.0 / distanceSq; 
     double totalTransmittance = 1.0; 
     
     int x0 = static_cast<int>(std::floor(a.x / Chunk::TILE_SIZE));
@@ -212,10 +237,8 @@ double EnvironmentManager::calculateSignal(Point2D a, Point2D b) const {
         Point2D worldPos{ static_cast<double>(x0 * Chunk::TILE_SIZE), static_cast<double>(y0 * Chunk::TILE_SIZE) };
         Tile t = getTileAtWorldPos(worldPos);
         
-        // Умножаем пропускную способность
         totalTransmittance *= t.transmittance;
 
-        // Если сигнал почти умер - обрываем вычисления
         if (totalTransmittance < 0.001) {
             return 0.0;
         }
@@ -226,6 +249,5 @@ double EnvironmentManager::calculateSignal(Point2D a, Point2D b) const {
         if (e2 <= dx) { err += dx; y0 += sy; }
     }
 
-    // Возвращаем искаженный физический сигнал
     return baseSignal * totalTransmittance; 
 }
