@@ -12,6 +12,7 @@ void MobileBeacon::updateEstimation(const IEnvironment* env, const Sequence<Mobi
     MutableArraySequence<SignalData> validSignals;
 
     // pipeline сбора данных
+
     for (const auto& towerPos : staticTowers) {
         // Узнаем искаженный уровень сигнала через препятствия
         double rssi = env->calculateSignal(realPosition_, towerPos);
@@ -29,7 +30,7 @@ void MobileBeacon::updateEstimation(const IEnvironment* env, const Sequence<Mobi
 
     // Фильтр низких частот 
     // smoothing = 0.1 означает, что мы берем 90% от старой позиции и только 10% от новой
-    // Это убирает резкие "дергания" от шума (Jitter), делая движение круга плавным 
+    // Это убирает резкие "дергания" от шума (Jitter), делая движение круга погрешности плавным 
     estimation_.estimatedPos.x = math::lerp(estimation_.estimatedPos.x, rawEstimation.estimatedPos.x, g_Settings.smoothing);
     estimation_.estimatedPos.y = math::lerp(estimation_.estimatedPos.y, rawEstimation.estimatedPos.y, g_Settings.smoothing);
     

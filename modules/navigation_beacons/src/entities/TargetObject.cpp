@@ -30,13 +30,13 @@ void TargetObject::updateEstimation(const IEnvironment* env, const Sequence<Mobi
         const MobileBeacon* beacon = activeBeacons[i];
         if (!beacon) continue; 
         
-        // Мы берем не реальную позицию маяка, 
+        // Берем не реальную позицию маяка, 
         // а ту, которую он сам вычислил и передал
         LocationResult beaconEstimation = beacon->getEstimation();
-        // Сигнал идет от реальной позиции маяка до нас
+        // НО сигнал идет от реальной позиции маяка до TargetObject
         double rssi = env->calculateSignal(realPosition_, beacon->getRealPosition());
-        
-        if (rssi > 0.1) { // Мобильные передатчики слабее, порог жестче
+        //TODO: подумать над значением на которое порог жестче 
+        if (rssi > g_Settings.signalThreshold + 0.1) { // Мобильные передатчики слабее, порог жестче 
             allSignals.append(SignalData{
                 beaconEstimation.estimatedPos,   // Координаты, в которых маяк думает, что он находится
                 rssi,

@@ -9,7 +9,7 @@ class MobileBeacon;
 class Entity {
 protected:
     Point2D realPosition_;      // Реальные координаты на карте
-    Point2D velocity_;          // Вектор скорости (пикселей в секунду)
+    Point2D velocity_;          // Нормализованный вектор скорости (пикселей в секунду)
     LocationResult estimation_; // Вычисленные координаты и радиус ошибки
     float speed_;               // Скалярная скорость
 
