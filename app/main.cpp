@@ -4,7 +4,8 @@
 #include <iostream>
 #include <exception>
 
-#include "MockEnvironment.hpp"
+#include "EnvironmentManager.hpp"
+#include "MapRenderer.hpp"
 #include "exceptions/EnvironmentExceptions.hpp"
 #include "exceptions/NavigationExceptions.hpp"
 #include "Navigator.hpp"
@@ -15,8 +16,12 @@ void runSimulation() {
     INavigator* navigator = nullptr;
 
     try {
-        environment = new MockEnvironment();
+        environment = new EnvironmentManager();
+        // Принудительно генерируем мир вокруг точки спавна объекта (400, 300)
+        environment->triggerLazyGeneration(Point2D{400.0, 300.0});
+        
         navigator = new Navigator(environment);
+
     } catch (const std::exception& e) {
         std::cerr << "Initialization error: " << e.what() << '\n';
         delete navigator;
@@ -53,6 +58,9 @@ void runSimulation() {
     sf::Clock deltaClock;
 
     NavigationRenderer renderer;
+    MapRenderer mapRenderer; 
+
+    float currentZoom = 1.0f; //стандартный масштаб
 
     // Главный цикл
     while (window.isOpen()) {
@@ -61,6 +69,15 @@ void runSimulation() {
             ImGui::SFML::ProcessEvent(window, event);
             if (event.type == sf::Event::Closed) {
                 window.close();
+            }
+            if (event.type == sf::Event::MouseWheelScrolled && !ImGui::GetIO().WantCaptureMouse) {
+                if (event.mouseWheelScroll.delta > 0) {
+                    currentZoom *= 0.8f; // Крутим вверх -> Приближаем
+                } else {
+                    currentZoom *= 1.2f; // Крутим вниз -> Отдаляем
+                }
+                // Ограничиваем зум (от х0.2 до х3.0)
+                currentZoom = std::clamp(currentZoom, 0.2f, 3.0f);
             }
         }
 
@@ -81,6 +98,8 @@ void runSimulation() {
         // ЛОГИКА 
         try {
             navigator->updateEntities(dt.asSeconds());
+            if (navigator->getTarget()) {
+                environment->triggerLazyGeneration(navigator->getTarget()->getRealPosition());            }
         } catch (const NavigationException& e) {
             // Ловим только ошибки навигации (например, SignalLostException)
             std::cerr << "Navigation Warning: " << e.what() << '\n';
@@ -115,11 +134,27 @@ void runSimulation() {
         // ОТРИСОВКА SFML
         window.clear(sf::Color(30, 30, 30));
 
-        // TODO: MapRenderer.render(window, environment);
-        // TODO: NavigationRenderer.render(window, navigator);
+        // Настраиваем камеру на объект
+        if (navigator->getTarget()) {
+            sf::View view = window.getDefaultView(); // Берем стандартный размер
+            view.zoom(currentZoom);
+            Point2D pos = navigator->getTarget()->getRealPosition();
+            // Центрируем камеру точно на красной точке!
+            view.setCenter(static_cast<float>(pos.x), static_cast<float>(pos.y));
+            window.setView(view); // Применяем камеру к окному
+        }
 
-        window.clear(sf::Color(30, 30, 30));
+        // Динамически приводим интерфейс к конкретному классу, чтобы получить чанки
+        auto* concreteEnv = dynamic_cast<EnvironmentManager*>(environment);
+        if (concreteEnv) {
+            mapRenderer.render(window, concreteEnv);
+        }
+
+        // TODO: NavigationRenderer.render(window, navigator);
         renderer.render(window, navigator, environment);
+
+        // Возвращаем камеру по умолчанию, чтобы меню рисовалось на экране ровно
+        window.setView(window.getDefaultView());
 
         ImGui::SFML::Render(window);
         window.display();
