@@ -7,10 +7,10 @@ add_library(navigation_beacons STATIC ${SOURCES}
         src/entities/MobileBeacon.cpp
         include/entities/TargetObject.hpp
         src/entities/TargetObject.cpp
-        include/math/TrilaterationSolver.hpp
-        src/math/TrilaterationSolver.cpp
         include/Navigator.hpp
-        src/Navigator.cpp)
+        src/Navigator.cpp
+        include/math/AoASolver.hpp
+        src/math/AoASolver.cpp)
 
 target_include_directories(navigation_beacons PUBLIC 
         ${CMAKE_CURRENT_SOURCE_DIR}/include
