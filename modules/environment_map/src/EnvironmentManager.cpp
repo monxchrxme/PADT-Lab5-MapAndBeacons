@@ -1,5 +1,6 @@
 #include "../include/EnvironmentManager.hpp"
 #include "../../../core/include/exceptions/EnvironmentExceptions.hpp"
+#include "../../../core/include/physics/RadioPhysics.hpp"
 #include <cmath>
 #include <cstdint>
 
@@ -215,17 +216,60 @@ MutableArraySequence<Point2D> EnvironmentManager::getStaticTowers() const {
     return staticTowers; 
 }
 
-double EnvironmentManager::calculateSignal(Point2D a, Point2D b) const {
-    double distanceSq = (b.x - a.x) * (b.x - a.x) + (b.y - a.y) * (b.y - a.y);
-    if (distanceSq < 1.0) distanceSq = 1.0; 
+// double EnvironmentManager::calculateSignal(Point2D a, Point2D b) const {
+//     double distanceSq = (b.x - a.x) * (b.x - a.x) + (b.y - a.y) * (b.y - a.y);
+//     if (distanceSq < 1.0) distanceSq = 1.0; 
     
-    double baseSignal = 100000.0 / distanceSq; 
+//     double baseSignal = 100000.0 / distanceSq; 
+//     double totalTransmittance = 1.0; 
+    
+//     int x0 = static_cast<int>(std::floor(a.x / Chunk::TILE_SIZE));
+//     int y0 = static_cast<int>(std::floor(a.y / Chunk::TILE_SIZE));
+//     int x1 = static_cast<int>(std::floor(b.x / Chunk::TILE_SIZE));
+//     int y1 = static_cast<int>(std::floor(b.y / Chunk::TILE_SIZE));
+
+//     int dx = std::abs(x1 - x0);
+//     int dy = -std::abs(y1 - y0);
+//     int sx = x0 < x1 ? 1 : -1;
+//     int sy = y0 < y1 ? 1 : -1;
+//     int err = dx + dy;
+
+//     while (true) {
+//         Point2D worldPos{ static_cast<double>(x0 * Chunk::TILE_SIZE), static_cast<double>(y0 * Chunk::TILE_SIZE) };
+//         Tile t = getTileAtWorldPos(worldPos);
+        
+//         totalTransmittance *= t.transmittance;
+
+//         if (totalTransmittance < 0.001) {
+//             return 0.0;
+//         }
+
+//         if (x0 == x1 && y0 == y1) break;
+//         int e2 = 2 * err;
+//         if (e2 >= dy) { err += dy; x0 += sx; }
+//         if (e2 <= dx) { err += dx; y0 += sy; }
+//     }
+
+//     return baseSignal * totalTransmittance; 
+// }
+
+MutableArraySequence<RadioPath> EnvironmentManager::computePaths(Point2D tx, Point2D rx, double frequencyGHz) const {
+    MutableArraySequence<RadioPath> paths;
+
+    double distanceSq = (rx.x - tx.x) * (rx.x - tx.x) + (rx.y - tx.y) * (rx.y - tx.y);
+    double dist = std::sqrt(distanceSq);
+    if (dist < 1.0) dist = 1.0;
+
+    // Вектор прихода луча
+    Point2D arrivalVec = { (rx.x - tx.x) / dist, (rx.y - tx.y) / dist };
+    
     double totalTransmittance = 1.0; 
-    
-    int x0 = static_cast<int>(std::floor(a.x / Chunk::TILE_SIZE));
-    int y0 = static_cast<int>(std::floor(a.y / Chunk::TILE_SIZE));
-    int x1 = static_cast<int>(std::floor(b.x / Chunk::TILE_SIZE));
-    int y1 = static_cast<int>(std::floor(b.y / Chunk::TILE_SIZE));
+
+    // Алгоритм DDA (Брезенхем) 
+    int x0 = static_cast<int>(std::floor(tx.x / Chunk::TILE_SIZE));
+    int y0 = static_cast<int>(std::floor(tx.y / Chunk::TILE_SIZE));
+    int x1 = static_cast<int>(std::floor(rx.x / Chunk::TILE_SIZE));
+    int y1 = static_cast<int>(std::floor(rx.y / Chunk::TILE_SIZE));
 
     int dx = std::abs(x1 - x0);
     int dy = -std::abs(y1 - y0);
@@ -237,10 +281,10 @@ double EnvironmentManager::calculateSignal(Point2D a, Point2D b) const {
         Point2D worldPos{ static_cast<double>(x0 * Chunk::TILE_SIZE), static_cast<double>(y0 * Chunk::TILE_SIZE) };
         Tile t = getTileAtWorldPos(worldPos);
         
-        totalTransmittance *= t.transmittance;
+        totalTransmittance *= RadioPhysics::getTileTransmittance(t.type, frequencyGHz);
 
         if (totalTransmittance < 0.001) {
-            return 0.0;
+            break; // Сигнал полностью угас в препятствиях, прерываем луч
         }
 
         if (x0 == x1 && y0 == y1) break;
@@ -249,5 +293,23 @@ double EnvironmentManager::calculateSignal(Point2D a, Point2D b) const {
         if (e2 <= dx) { err += dx; y0 += sy; }
     }
 
-    return baseSignal * totalTransmittance; 
+    // ФОРМИРОВАНИЕ ПУТЕЙ (Если сигнал пробился)
+    if (totalTransmittance >= 0.001) {
+        // Луч 1: Прямая видимость (Line of Sight - LOS)
+        paths.append(RadioPath{
+            dist, arrivalVec, totalTransmittance, 0
+        });
+
+        // Луч 2: Эмуляция отражения от земли
+        double h_tx = 10.0; // Высота вышки
+        double h_rx = 2.0;  // Высота мобильного маяка
+        double dist_reflected = std::sqrt(dist * dist + (h_tx + h_rx) * (h_tx + h_rx));
+        
+        // Отраженный луч теряет часть энергии при ударе о землю (пока константа 0.8)
+        paths.append(RadioPath{
+            dist_reflected, arrivalVec, totalTransmittance * 0.8, 1
+        });
+    }
+
+    return paths;
 }

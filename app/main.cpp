@@ -114,16 +114,15 @@ void runSimulation() {
         ImGui::Separator();
         
         ImGui::Text("Физика эфира");
+        ImGui::SliderFloat("Частота (ГГц)", &g_Settings.frequencyGHz, 0.9f, 6.0f, "%.1f");
         ImGui::SliderFloat("Мощность (TxPower)", &g_Settings.baseTxPower, 10000.0f, 500000.0f, "%.0f");
-        ImGui::SliderFloat("Шум среды (+/- %)", &g_Settings.noiseVariation, 0.0f, 0.5f, "%.2f");
-        ImGui::SliderFloat("Порог приема", &g_Settings.signalThreshold, 0.01f, 0.2f, "%.3f");
-        
+        ImGui::SliderFloat("Порог приема", &g_Settings.signalThreshold, 0.001f, 0.1f, "%.3f");
+
         ImGui::Separator();
-        ImGui::Text("Математика Навигации");
+        ImGui::Text("DSP и Пеленгация");
         ImGui::SliderFloat("Сглаживание (Lerp)", &g_Settings.smoothing, 0.01f, 1.0f, "%.2f");
-        ImGui::SliderFloat("Градиентный шаг", &g_Settings.learningRate, 0.05f, 2.0f, "%.2f");
-        ImGui::SliderFloat("Аппаратная погрешность", &g_Settings.baseUncertainty, 0.0f, 50.0f, "%.1f");
-        ImGui::SliderFloat("Пропускаемость стены", &g_Settings.wallAttenuation, 0.05f, 1.0f, "%.2f");
+        ImGui::SliderFloat("Аппаратный шум (Jitter)", &g_Settings.hardwareJitter, 0.0f, 50.0f, "%.1f"); 
+        
 
         ImGui::Separator();
         if (ImGui::Button("Regenerate Map")) {

@@ -1,15 +1,6 @@
 #pragma once
 #include <cmath>
 
-enum class TileType {
-    EMPTY,    
-    FOREST,   
-    WATER,    
-    WALL,      
-    PATH,       
-    TOWER_BASE   
-};
-
 class RadioPhysics {
 public:
     // Статический метод вычисления коэффициента пропускания сквозь 1 тайл препятствия

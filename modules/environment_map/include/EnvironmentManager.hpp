@@ -22,7 +22,7 @@ public:
 
     // Реализация интерфейса IEnvironment
     [[nodiscard]] bool isPassable(Point2D p) const override;
-    [[nodiscard]] double calculateSignal(Point2D a, Point2D b) const override;
+    [[nodiscard]] MutableArraySequence<RadioPath> computePaths(Point2D tx, Point2D rx, double frequencyGHz) const override;
     void triggerLazyGeneration(Point2D p) override;
     
     [[nodiscard]] MutableArraySequence<Point2D> getStaticTowers() const override; 

@@ -7,17 +7,6 @@
 void NavigationRenderer::render(sf::RenderWindow& window, const INavigator* navigator, const IEnvironment* env) const {
     if (!navigator || !env) return;
 
-    // // Отрисовка Стационарных Вышек (Фон)
-    // MutableArraySequence<Point2D> towers = env->getStaticTowers();
-    // sf::RectangleShape towerShape(sf::Vector2f(16.0f, 16.0f));
-    // towerShape.setFillColor(sf::Color::Green);
-    // towerShape.setOrigin(8.0f, 8.0f); 
-
-    // for (int i = 0; i < towers.get_length(); ++i) {
-    //     towerShape.setPosition(static_cast<float>(towers[i].x), static_cast<float>(towers[i].y));
-    //     window.draw(towerShape);
-    // }
-
     // Лямбда функция для отрисовки динамических сущностей
     auto drawEntity = [&](Point2D realPos, LocationResult est, sf::Color color) {
         // Отрисовка зоны погрешности (Вычисленная позиция)

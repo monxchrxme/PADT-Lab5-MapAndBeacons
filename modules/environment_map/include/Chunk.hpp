@@ -1,15 +1,6 @@
 #pragma once
 #include "../../../core/include/Structures.hpp" 
 
-enum class TileType {
-    EMPTY,    
-    FOREST,   
-    WATER,    
-    WALL,      
-    PATH,       
-    TOWER_BASE   
-};
-
 struct Tile {
     TileType type = TileType::EMPTY;
     bool isPassable = true;

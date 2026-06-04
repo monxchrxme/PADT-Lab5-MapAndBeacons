@@ -20,8 +20,6 @@ public:
     Navigator(const Navigator&) = delete;
     Navigator& operator=(const Navigator&) = delete;
 
-    // Реализация интерфейса INavigator
-    [[nodiscard]] LocationResult estimateLocation(const Sequence<SignalData>& signals) const override;
     // Главный метод симуляции
     void updateEntities(float deltaTime) override;
 

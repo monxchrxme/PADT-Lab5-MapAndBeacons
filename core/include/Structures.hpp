@@ -5,6 +5,15 @@ struct Point2D {
     double y;
 };
 
+enum class TileType {
+    EMPTY,    
+    FOREST,   
+    WATER,    
+    WALL,      
+    PATH,       
+    TOWER_BASE   
+};
+
 // Радио-путь (Отдельный луч, дошедший от Вышки к Приемнику)
 struct RadioPath {
     double distance;         // Точная геометрическая длина пути (для фазы)
