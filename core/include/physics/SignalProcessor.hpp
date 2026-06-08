@@ -36,6 +36,12 @@ public:
             // Базовая фаза на центральной антенне
             double phase = k * path.distance;
 
+            // При отражении от оптически более плотной среды (бетон, земля) 
+            // фаза радиоволны сдвигается на 180 градусов (Пи радиан)
+            if (path.bounceCount > 0) {
+                phase += std::numbers::pi * path.bounceCount; 
+            }
+
             // Вектор прихода луча (направляющие косинусы)
             double vx = path.arrivalVector.x;
             double vy = path.arrivalVector.y;

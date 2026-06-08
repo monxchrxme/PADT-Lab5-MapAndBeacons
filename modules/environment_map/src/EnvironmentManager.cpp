@@ -256,16 +256,14 @@ MutableArraySequence<Point2D> EnvironmentManager::getStaticTowers() const {
 MutableArraySequence<RadioPath> EnvironmentManager::computePaths(Point2D tx, Point2D rx, double frequencyGHz) const {
     MutableArraySequence<RadioPath> paths;
 
-    double distanceSq = (rx.x - tx.x) * (rx.x - tx.x) + (rx.y - tx.y) * (rx.y - tx.y);
-    double dist = std::sqrt(distanceSq);
-    if (dist < 1.0) dist = 1.0;
-
-    // Вектор прихода луча
-    Point2D arrivalVec = { (rx.x - tx.x) / dist, (rx.y - tx.y) / dist };
+    // 1. ПРЯМОЙ ЛУЧ (Line of Sight - LOS) 
+    double distLOS = std::hypot(rx.x - tx.x, rx.y - tx.y);
+    if (distLOS < 1.0) distLOS = 1.0;
     
-    double totalTransmittance = 1.0; 
+    Point2D arrivalVecLOS = { (rx.x - tx.x) / distLOS, (rx.y - tx.y) / distLOS };
+    double totalTransmittanceLOS = 1.0; 
 
-    // Алгоритм DDA (Брезенхем) 
+    // Алгоритм DDA для прямого луча
     int x0 = static_cast<int>(std::floor(tx.x / Chunk::TILE_SIZE));
     int y0 = static_cast<int>(std::floor(tx.y / Chunk::TILE_SIZE));
     int x1 = static_cast<int>(std::floor(rx.x / Chunk::TILE_SIZE));
@@ -277,39 +275,59 @@ MutableArraySequence<RadioPath> EnvironmentManager::computePaths(Point2D tx, Poi
     int sy = y0 < y1 ? 1 : -1;
     int err = dx + dy;
 
+    // Флаг: врезались ли мы в стену по пути (используем для отражения)
+    bool hitWall = false;
+    Point2D wallHitPos = {0, 0};
+
     while (true) {
         Point2D worldPos{ static_cast<double>(x0 * Chunk::TILE_SIZE), static_cast<double>(y0 * Chunk::TILE_SIZE) };
         Tile t = getTileAtWorldPos(worldPos);
         
-        totalTransmittance *= RadioPhysics::getTileTransmittance(t.type, frequencyGHz);
+        // Физическое затухание
+        totalTransmittanceLOS *= RadioPhysics::getTileTransmittance(t.type, frequencyGHz);
 
-        if (totalTransmittance < 0.001) {
-            break; // Сигнал полностью угас в препятствиях, прерываем луч
+        // Запоминаем первую встреченную стену для расчета отражений
+        if (t.type == TileType::WALL && !hitWall) {
+            hitWall = true;
+            wallHitPos = worldPos;
         }
 
+        if (totalTransmittanceLOS < 0.001) break;
         if (x0 == x1 && y0 == y1) break;
+        
         int e2 = 2 * err;
         if (e2 >= dy) { err += dy; x0 += sx; }
         if (e2 <= dx) { err += dx; y0 += sy; }
     }
 
-    // ФОРМИРОВАНИЕ ПУТЕЙ (Если сигнал пробился)
-    if (totalTransmittance >= 0.001) {
-        // Луч 1: Прямая видимость (Line of Sight - LOS)
-        paths.append(RadioPath{
-            dist, arrivalVec, totalTransmittance, 0
-        });
-
-        // Луч 2: Эмуляция отражения от земли
-        double h_tx = 10.0; // Высота вышки
-        double h_rx = 2.0;  // Высота мобильного маяка
-        double dist_reflected = std::sqrt(dist * dist + (h_tx + h_rx) * (h_tx + h_rx));
-        
-        // Отраженный луч теряет часть энергии при ударе о землю (пока константа 0.8)
-        paths.append(RadioPath{
-            dist_reflected, arrivalVec, totalTransmittance * 0.8, 1
-        });
+    if (totalTransmittanceLOS >= 0.001) {
+        paths.append(RadioPath{ distLOS, arrivalVecLOS, totalTransmittanceLOS, 0 });
     }
 
+    // 2. ОТРАЖЕННЫЙ ОТ ЗЕМЛИ ЛУЧ (Ground Bounce) 
+    // Постоянно присутствует в радиоэфире, создает замирания
+    double h_tx = 10.0; 
+    double h_rx = 2.0;  
+    double distGround = std::sqrt(distLOS * distLOS + (h_tx + h_rx) * (h_tx + h_rx));
+    paths.append(RadioPath{ distGround, arrivalVecLOS, totalTransmittanceLOS * 0.7, 1 });
+
+    // 3. МЕТОД МНИМЫХ ИСТОЧНИКОВ (Wall Bounce - ISM) 
+    // Если по пути мы нашли стену, то посчитаем отражение от неё
+    if (hitWall) {
+        double wallX = wallHitPos.x + Chunk::TILE_SIZE / 2.0; 
+        Point2D virtualTx = { wallX + (wallX - tx.x), tx.y };
+        double distBounce = std::hypot(rx.x - virtualTx.x, rx.y - virtualTx.y);
+        if (distBounce > 1.0) {
+            Point2D bounceArrivalVec = { (rx.x - virtualTx.x) / distBounce, (rx.y - virtualTx.y) / distBounce };
+            double cosTheta = std::abs(bounceArrivalVec.x); 
+            double reflectionCoeff = RadioPhysics::getReflectionCoefficient(TileType::WALL, cosTheta, frequencyGHz);
+            if (reflectionCoeff > 0.05) {
+                double finalBounceAtten = totalTransmittanceLOS * reflectionCoeff;
+                if (finalBounceAtten > 0.001) {
+                    paths.append(RadioPath{ distBounce, bounceArrivalVec, finalBounceAtten, 1 });
+                }
+            }
+        }
+    }
     return paths;
 }

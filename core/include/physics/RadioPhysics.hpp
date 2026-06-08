@@ -48,8 +48,28 @@ public:
         }
     }
 
-    // Здесь позже добавим метод коэффициентов отражения Френеля для отраженных лучей
-    [[nodiscard]] static double getReflectionCoefficient(TileType type, double angleRadians, double frequencyGHz) {
-        return 0.5; // Пока заглушка для первого этапа
+    // Вычисление коэффициента отражения (Амплитуды) по формуле Шлика
+    // cosTheta - косинус угла падения (1.0 - перпендикулярно стене, 0.0 - вскользь)
+    [[nodiscard]] static double getReflectionCoefficient(TileType type, double cosTheta, double /*frequencyGHz*/) {
+        double R0 = 0.0; // Базовый коэффициент отражения при нормальном падении (по мощности)
+
+        switch (type) {
+            case TileType::WALL:   R0 = 0.15; break; 
+            case TileType::WATER:  R0 = 0.80; break; 
+            case TileType::FOREST: R0 = 0.02; break; 
+            default:               R0 = 0.00; break;
+        }
+
+        // Защита от отрицательного косинуса
+        double absCos = std::abs(cosTheta);
+        if (absCos > 1.0) absCos = 1.0;
+
+        // Аппроксимация Шлика: R = R0 + (1 - R0) * (1 - cosTheta)^5
+        double oneMinusCos = 1.0 - absCos;
+        double schlickPower = oneMinusCos * oneMinusCos * oneMinusCos * oneMinusCos * oneMinusCos;
+        double reflectedPower = R0 + (1.0 - R0) * schlickPower;
+
+        // Возвращаем коэффициент для АМПЛИТУДЫ (корень из мощности)
+        return std::sqrt(reflectedPower);
     }
 };
