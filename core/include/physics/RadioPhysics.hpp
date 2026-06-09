@@ -40,7 +40,8 @@ public:
             }
 
             case TileType::WATER: {
-                return 0.001; 
+                // Волна летит НАД водой (через воздух)
+                return 1.0; 
             }
 
             default:
