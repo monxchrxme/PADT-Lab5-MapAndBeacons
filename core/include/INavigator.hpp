@@ -1,6 +1,7 @@
 #pragma once
 #include "Structures.hpp"
 #include "interfaces/sequence.hpp"
+#include "sequences/mutable_array_sequence.hpp" 
 
 class TargetObject;
 class MobileBeacon;
@@ -18,4 +19,6 @@ public:
     
     [[nodiscard]] virtual const TargetObject* getTarget() const = 0;
     [[nodiscard]] virtual const Sequence<MobileBeacon*>& getBeacons() const = 0;
+    // Возвращает активные сетевые соединения для отрисовки
+    [[nodiscard]] virtual MutableArraySequence<NetworkLink> getActiveLinks() const = 0;
 };

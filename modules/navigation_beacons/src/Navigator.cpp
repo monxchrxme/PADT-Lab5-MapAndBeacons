@@ -1,4 +1,6 @@
 #include "Navigator.hpp"
+#include "MathUtils.hpp"
+#include "Structures.hpp"
 #include <stdexcept>
 
 Navigator::Navigator(const IEnvironment* env) : environment_(env) {
@@ -26,7 +28,18 @@ Navigator::~Navigator() {
 }
 
 void Navigator::updateEntities(float dt) {
-    // Обновляем все мобильные маяки 
+    // 0. Очистка старых линий связи (эффект затухания) 
+    MutableArraySequence<NetworkLink> aliveLinks;
+    for (int i = 0; i < activeLinks_.get_length(); ++i) {
+        NetworkLink link = activeLinks_[i];
+        link.lifeTime -= dt;
+        if (link.lifeTime > 0.0f) {
+            aliveLinks.append(link);
+        }
+    }
+    activeLinks_ = aliveLinks;
+
+    // 1. Обновляем все мобильные маяки 
     for (int i = 0; i < beacons_.get_length(); ++i) {
         MobileBeacon* beacon = beacons_[i];
         // Маяк шагает
@@ -46,5 +59,55 @@ void Navigator::updateEntities(float dt) {
         target_->updateEstimation(environment_, beacons_);
     } catch (...) {
         // Игнорируем потерю сигнала у главной цели
+    }
+
+    // 3. ГЕНЕРАЦИЯ ПАКЕТОВ (Главная Цель транслируется в эфир)
+    timeSinceLastPacket_ += dt;
+    if (timeSinceLastPacket_ > 0.5f) {
+        timeSinceLastPacket_ = 0.0f;
+        packetIdCounter_++;
+
+        MeshPacket newPacket{ packetIdCounter_, 3, target_->getEstimation().estimatedPos, target_->getEstimation().errorRadius };
+
+        for (int i = 0; i < beacons_.get_length(); ++i) {
+            if (math::distance(target_->getRealPosition(), beacons_[i]->getRealPosition()) < g_Settings.meshCommRadius) {
+                beacons_[i]->receivePacket(newPacket);
+                // ЖЕЛТАЯ СВЯЗЬ: Target -> Beacon
+                activeLinks_.append(NetworkLink{target_->getRealPosition(), beacons_[i]->getRealPosition(), 0.3f, LinkType::TargetToBeacon});
+            }
+        }
+    }
+
+    // 4. РЕТРАНСЛЯЦИЯ MESH-СЕТИ (Доставка до Вышек) 
+    MutableArraySequence<Point2D> towers = environment_->getStaticTowers(); // Запрашиваем вышки
+
+    for (int i = 0; i < beacons_.get_length(); ++i) {
+        auto packetsToTx = beacons_[i]->flushTxQueue();
+        
+        for (int p = 0; p < packetsToTx.get_length(); ++p) {
+            
+            // А) Пытаемся доставить пакет на Базовую Станцию (Стационарную вышку)
+            bool deliveredToTower = false;
+            for (int t = 0; t < towers.get_length(); ++t) {
+                if (math::distance(beacons_[i]->getRealPosition(), towers[t]) < g_Settings.meshCommRadius) {
+                    // ЗЕЛЕНАЯ СВЯЗЬ: Beacon -> Tower
+                    activeLinks_.append(NetworkLink{beacons_[i]->getRealPosition(), towers[t], 0.3f, LinkType::BeaconToTower});
+                    deliveredToTower = true;
+                }
+            }
+
+            // Б) Если до вышки не достали, пересылаем другим маякам
+            if (!deliveredToTower) {
+                for (int j = 0; j < beacons_.get_length(); ++j) {
+                    if (i == j) continue;
+
+                    if (math::distance(beacons_[i]->getRealPosition(), beacons_[j]->getRealPosition()) < g_Settings.meshCommRadius) {
+                        beacons_[j]->receivePacket(packetsToTx[p]);
+                        // ГОЛУБАЯ СВЯЗЬ: Beacon -> Beacon
+                        activeLinks_.append(NetworkLink{beacons_[i]->getRealPosition(), beacons_[j]->getRealPosition(), 0.3f, LinkType::BeaconToBeacon});
+                    }
+                }
+            }
+        }
     }
 }

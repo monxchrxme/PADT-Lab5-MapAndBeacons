@@ -1,6 +1,7 @@
 #include "math/AoASolver.hpp"
 #include "exceptions/NavigationExceptions.hpp"
 #include <cmath>
+#include "MathUtils.hpp"
 
 LocationResult AoASolver::solve(const Sequence<ProcessedSignal>& signals) {
     const int count = signals.get_length();
@@ -63,6 +64,7 @@ LocationResult AoASolver::solve(const Sequence<ProcessedSignal>& signals) {
     // В методе МНК радиус ошибки — это среднее перпендикулярное расстояние 
     // от найденной точки до каждого направленного луча (прямой)
     double totalErrorRadius = 0.0;
+    double meanDistance = 0.0; // Среднее расстояние до вышек
     
     for (int i = 0; i < count; ++i) {
         ProcessedSignal sig = signals[i];
@@ -70,14 +72,18 @@ LocationResult AoASolver::solve(const Sequence<ProcessedSignal>& signals) {
         double c = std::cos(sig.azimuth);
         double b_i = s * sig.sourcePos.x - c * sig.sourcePos.y;
         
-        // Геометрическое расстояние от точки (X, Y) до прямой A*x + B*y = C
         double distanceToLine = std::abs(s * estimatedPos.x - c * estimatedPos.y - b_i);
         totalErrorRadius += distanceToLine;
+        meanDistance += math::distance(estimatedPos, sig.sourcePos);
     }
     totalErrorRadius /= count;
+    meanDistance /= count;
 
-    // Добавляем базовую неуверенность аппаратуры (Noise Floor)
-    totalErrorRadius += g_Settings.hardwareJitter;
+    // Аппаратная ошибка масштабируется от расстояния
+    // Если ты вплотную к вышке (meanDistance ~ 10), шум минимален (круг сжимается в точку)
+    // Если вышки далеко (meanDistance ~ 500), угловой шум дает большую погрешность
+    double scaledJitter = g_Settings.hardwareJitter * (meanDistance / 100.0);
+    totalErrorRadius += scaledJitter;
 
     return LocationResult{ estimatedPos, totalErrorRadius };
 }

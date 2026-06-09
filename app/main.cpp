@@ -123,6 +123,10 @@ void runSimulation() {
         ImGui::SliderFloat("Сглаживание (Lerp)", &g_Settings.smoothing, 0.01f, 1.0f, "%.2f");
         ImGui::SliderFloat("Аппаратный шум (Jitter)", &g_Settings.hardwareJitter, 0.0f, 50.0f, "%.1f"); 
         
+        ImGui::Separator();
+        ImGui::Text("Отрисовка (Debug Draw)");
+        ImGui::Checkbox("Показать Mesh-сеть", &g_Settings.showMeshNetwork);
+        ImGui::SliderFloat("Радиус связи (Mesh)", &g_Settings.meshCommRadius, 50.0f, 800.0f, "%.0f");
 
         ImGui::Separator();
         if (ImGui::Button("Regenerate Map")) {

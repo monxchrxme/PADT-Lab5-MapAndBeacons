@@ -35,6 +35,29 @@ struct ProcessedSignal {
     double azimuth;    // Вычисленный угол прихода (Angle of Arrival)
 };
 
+// Типы сетевых связей для отрисовки разными цветами
+enum class LinkType {
+    TargetToBeacon,  // Желтый
+    BeaconToBeacon,  // Голубой
+    BeaconToTower    // Зеленый (Успешная доставка)
+};
+
+// Пакет Mesh-сети (Лавинная маршрутизация)
+struct MeshPacket {
+    int packetId;         // Уникальный ID пакета (защита от зацикливания)
+    int ttl;              // Time-To-Live (оставшееся число прыжков)
+    Point2D payloadPos;   // Передаваемые данные: координаты Цели
+    double payloadError;  // Передаваемые данные: погрешность Цели
+};
+
+// Линия связи (для отрисовки передачи данных в UI)
+struct NetworkLink {
+    Point2D from;
+    Point2D to;
+    float lifeTime; // Время жизни линии на экране (для эффекта затухания)
+    LinkType type;  // Тип связи 
+};
+
 // Глобальные настройки (CVars) 
 struct SimulationSettings {
     float baseTxPower = 100000.0f; 
@@ -42,6 +65,11 @@ struct SimulationSettings {
     float smoothing = 0.1f;
     float frequencyGHz = 2.4f;      // Несущая частота (по умолчанию 2.4 ГГц)
     float hardwareJitter = 10.0f;   // Аппаратная погрешность (в пикселях)
+
+    float maxErrorRadius = 600.0f;  // Ограничитель (размер экрана)
+    float meshCommRadius = 300.0f;  // длина связи mesh-сети
+
+    bool showMeshNetwork = true;    // Включена ли отрисовка лазеров сети
 };
 
 // глобальная переменная, которая безопасно объявляется прямо в заголовочном файле

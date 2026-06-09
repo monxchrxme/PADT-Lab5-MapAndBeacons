@@ -12,6 +12,11 @@ private:
     TargetObject* target_;
     MutableArraySequence<MobileBeacon*> beacons_;
 
+    // ДАННЫЕ ДЛЯ СЕТИ 
+    MutableArraySequence<NetworkLink> activeLinks_; // Линии передачи для UI
+    int packetIdCounter_ = 0;                       // Генератор уникальных ID
+    float timeSinceLastPacket_ = 0.0f;              // Таймер отправки
+
 public:
     explicit Navigator(const IEnvironment* env);
     ~Navigator() override;
@@ -31,4 +36,5 @@ public:
     // Геттеры для рендерера 
     [[nodiscard]] const TargetObject* getTarget() const override { return target_; }
     [[nodiscard]] const Sequence<MobileBeacon*>& getBeacons() const override { return beacons_; }
+    [[nodiscard]] MutableArraySequence<NetworkLink> getActiveLinks() const override { return activeLinks_; }
 };
