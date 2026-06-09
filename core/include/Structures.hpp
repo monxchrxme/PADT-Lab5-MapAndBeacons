@@ -68,7 +68,8 @@ struct SimulationSettings {
 
     float maxErrorRadius = 600.0f;  // Ограничитель (размер экрана)
     float meshCommRadius = 300.0f;  // длина связи mesh-сети
-
+    
+    bool showAoARays = false;       // Включена ли отрисовка векторов пеленгов (AoA Rays)
     bool showMeshNetwork = true;    // Включена ли отрисовка лазеров сети
 };
 

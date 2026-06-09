@@ -48,6 +48,9 @@ void TargetObject::updateEstimation(const IEnvironment* env, const Sequence<Mobi
         }
     }
 
+    // Запоминаем сигналы для отрисовки перед отправкой в решатель
+    lastSignals_ = allSignals;
+    
     // Матричная Триангуляция и динамическое сглаживание 
     try {
         LocationResult rawEstimation = AoASolver::solve(allSignals);

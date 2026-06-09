@@ -60,6 +60,9 @@ void MobileBeacon::updateEstimation(const IEnvironment* env, const Sequence<Mobi
         }
     }
 
+    // Запоминаем сигналы для отрисовки перед отправкой в решатель
+    lastSignals_ = validSignals;
+
     // 3. Матричная Триангуляция (AoA)
     try {
         LocationResult rawEstimation = AoASolver::solve(validSignals);

@@ -9,7 +9,7 @@ void NavigationRenderer::render(sf::RenderWindow& window, const INavigator* navi
     if (!navigator || !env) return;
 
     // Лямбда функция для отрисовки динамических сущностей
-    auto drawEntity = [&](Point2D realPos, LocationResult est, sf::Color color) {
+    auto drawEntity = [&](Point2D realPos, LocationResult est, sf::Color color, const Sequence<ProcessedSignal>& signals) {
         // Отрисовка зоны погрешности (Вычисленная позиция)
         // минимальный визуал 2 пикселя даже при идеальной точности
         float radius = std::max(2.0f, static_cast<float>(est.errorRadius));
@@ -30,6 +30,25 @@ void NavigationRenderer::render(sf::RenderWindow& window, const INavigator* navi
         realDot.setPosition(static_cast<float>(realPos.x), static_cast<float>(realPos.y));
         realDot.setFillColor(color);
         window.draw(realDot);
+
+        // Отрисовка лучей пеленгации (AoA Rays)
+        if (g_Settings.showAoARays) {
+            for (int j = 0; j < signals.get_length(); ++j) {
+                ProcessedSignal sig = signals[j];
+                
+                // Луч выходит из Вышки (источника) и летит в сторону нашего объекта под вычисленным Азимутом
+                Point2D start = sig.sourcePos;
+                Point2D end = { start.x + std::cos(sig.azimuth) * 2000.0, 
+                                start.y + std::sin(sig.azimuth) * 2000.0 };
+
+                // Рисуем градиентную линию (в начале яркая, в конце прозрачная)
+                sf::Vertex ray[] = {
+                    sf::Vertex(sf::Vector2f(static_cast<float>(start.x), static_cast<float>(start.y)), sf::Color(color.r, color.g, color.b, 150)),
+                    sf::Vertex(sf::Vector2f(static_cast<float>(end.x), static_cast<float>(end.y)), sf::Color(color.r, color.g, color.b, 0))
+                };
+                window.draw(ray, 2, sf::Lines);
+            }
+        }
     };
 
     // Отрисовка Мобильных Маяков 
@@ -37,14 +56,15 @@ void NavigationRenderer::render(sf::RenderWindow& window, const INavigator* navi
     for (int i = 0; i < beacons.get_length(); ++i) {
         const MobileBeacon* beacon = beacons[i];
         if (beacon) {
-            drawEntity(beacon->getRealPosition(), beacon->getEstimation(), sf::Color(100, 150, 255));
+            drawEntity(beacon->getRealPosition(), beacon->getEstimation(), sf::Color(100, 150, 255), beacon->getLastSignals());
         }
     }
 
     // Отрисовка Главной Цели 
     const TargetObject* target = navigator->getTarget();
     if (target) {
-        drawEntity(target->getRealPosition(), target->getEstimation(), sf::Color::Red);
+        
+        drawEntity(target->getRealPosition(), target->getEstimation(), sf::Color::Red, target->getLastSignals());
     }
 
     // 4. Отрисовка Mesh-сети (Лазерные линии передачи) 

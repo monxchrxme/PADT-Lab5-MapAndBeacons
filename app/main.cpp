@@ -127,6 +127,7 @@ void runSimulation() {
         ImGui::Text("Отрисовка (Debug Draw)");
         ImGui::Checkbox("Показать Mesh-сеть", &g_Settings.showMeshNetwork);
         ImGui::SliderFloat("Радиус связи (Mesh)", &g_Settings.meshCommRadius, 50.0f, 800.0f, "%.0f");
+        ImGui::Checkbox("Показать лучи пеленгации (AoA)", &g_Settings.showAoARays); 
 
         ImGui::Separator();
         if (ImGui::Button("Regenerate Map")) {

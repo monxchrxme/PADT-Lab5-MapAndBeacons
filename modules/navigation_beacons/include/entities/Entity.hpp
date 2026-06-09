@@ -13,6 +13,9 @@ protected:
     LocationResult estimation_; // Вычисленные координаты и радиус ошибки
     float speed_;               // Скалярная скорость
 
+    // Сохраняем последние обработанные сигналы
+    MutableArraySequence<ProcessedSignal> lastSignals_; 
+
 public:
     Entity(Point2D startPos, Point2D startDir, float speed)
         : realPosition_(startPos), velocity_(startDir), speed_(speed) {
@@ -41,4 +44,5 @@ public:
     [[nodiscard]] Point2D getRealPosition() const { return realPosition_; }
     [[nodiscard]] Point2D getVelocity() const { return velocity_; }
     [[nodiscard]] LocationResult getEstimation() const { return estimation_; }
+    [[nodiscard]] const Sequence<ProcessedSignal>& getLastSignals() const { return lastSignals_; }
 };
