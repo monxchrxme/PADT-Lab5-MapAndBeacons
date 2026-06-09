@@ -64,7 +64,8 @@ LocationResult AoASolver::solve(const Sequence<ProcessedSignal>& signals) {
     // В методе МНК радиус ошибки — это среднее перпендикулярное расстояние 
     // от найденной точки до каждого направленного луча (прямой)
     double totalErrorRadius = 0.0;
-    double meanDistance = 0.0; // Среднее расстояние до вышек
+    double meanDistance = 0.0; 
+    double totalWeight = 0.0; // Сумма всех весов
     
     for (int i = 0; i < count; ++i) {
         ProcessedSignal sig = signals[i];
@@ -72,16 +73,28 @@ LocationResult AoASolver::solve(const Sequence<ProcessedSignal>& signals) {
         double c = std::cos(sig.azimuth);
         double b_i = s * sig.sourcePos.x - c * sig.sourcePos.y;
         
+        // Геометрическое расстояние от точки до луча
         double distanceToLine = std::abs(s * estimatedPos.x - c * estimatedPos.y - b_i);
-        totalErrorRadius += distanceToLine;
-        meanDistance += math::distance(estimatedPos, sig.sourcePos);
+        
+        // Вес сигнала (тот же, что и при поиске точки)
+        double weight = sig.rssi;
+        
+        // Накапливаем ВЗВЕШЕННУЮ ошибку и ВЗВЕШЕННОЕ расстояние
+        totalErrorRadius += weight * distanceToLine;
+        meanDistance += weight * math::distance(estimatedPos, sig.sourcePos);
+        totalWeight += weight;
     }
-    totalErrorRadius /= count;
-    meanDistance /= count;
 
-    // Аппаратная ошибка масштабируется от расстояния
-    // Если ты вплотную к вышке (meanDistance ~ 10), шум минимален (круг сжимается в точку)
-    // Если вышки далеко (meanDistance ~ 500), угловой шум дает большую погрешность
+    // Нормируем на сумму весов (чтобы получить взвешенное среднее)
+    if (totalWeight > 1e-9) {
+        totalErrorRadius /= totalWeight;
+        meanDistance /= totalWeight;
+    } else {
+        totalErrorRadius /= count;
+        meanDistance /= count;
+    }
+
+    // Аппаратная ошибка масштабируется от взвешенного среднего расстояния
     double scaledJitter = g_Settings.hardwareJitter * (meanDistance / 100.0);
     totalErrorRadius += scaledJitter;
 

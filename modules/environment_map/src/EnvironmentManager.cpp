@@ -277,7 +277,7 @@ MutableArraySequence<RadioPath> EnvironmentManager::computePaths(Point2D tx, Poi
 
     // Флаг: врезались ли мы в стену по пути (используем для отражения)
     bool hitWall = false;
-    Point2D wallHitPos = {0, 0};
+    Point2D virtualTx = {0.0, 0.0}; 
 
     while (true) {
         Point2D worldPos{ static_cast<double>(x0 * Chunk::TILE_SIZE), static_cast<double>(y0 * Chunk::TILE_SIZE) };
@@ -289,7 +289,17 @@ MutableArraySequence<RadioPath> EnvironmentManager::computePaths(Point2D tx, Poi
         // Запоминаем первую встреченную стену для расчета отражений
         if (t.type == TileType::WALL && !hitWall) {
             hitWall = true;
-            wallHitPos = worldPos;
+            
+            // Если луч летит больше по горизонтали (dx > dy) -> ударились о ВЕРТИКАЛЬНУЮ грань
+            if (dx > std::abs(dy)) {
+                double wallX = (sx > 0) ? worldPos.x : worldPos.x + Chunk::TILE_SIZE;
+                virtualTx = { wallX + (wallX - tx.x), tx.y }; // Зеркалим по X
+            } 
+            // Иначе -> ударились о ГОРИЗОНТАЛЬНУЮ грань
+            else {
+                double wallY = (sy > 0) ? worldPos.y : worldPos.y + Chunk::TILE_SIZE;
+                virtualTx = { tx.x, wallY + (wallY - tx.y) }; // Зеркалим по Y
+            }
         }
 
         if (totalTransmittanceLOS < 0.001) break;
@@ -314,12 +324,16 @@ MutableArraySequence<RadioPath> EnvironmentManager::computePaths(Point2D tx, Poi
     // 3. МЕТОД МНИМЫХ ИСТОЧНИКОВ (Wall Bounce - ISM) 
     // Если по пути мы нашли стену, то посчитаем отражение от неё
     if (hitWall) {
-        double wallX = wallHitPos.x + Chunk::TILE_SIZE / 2.0; 
-        Point2D virtualTx = { wallX + (wallX - tx.x), tx.y };
         double distBounce = std::hypot(rx.x - virtualTx.x, rx.y - virtualTx.y);
         if (distBounce > 1.0) {
             Point2D bounceArrivalVec = { (rx.x - virtualTx.x) / distBounce, (rx.y - virtualTx.y) / distBounce };
-            double cosTheta = std::abs(bounceArrivalVec.x); 
+            // Вычисляем угол падения в зависимости от того, какую плоскость мы пробили
+            double cosTheta = 0.0;
+            if (dx > std::abs(dy)) {
+                cosTheta = std::abs(bounceArrivalVec.x); // Отражение от вертикали
+            } else {
+                cosTheta = std::abs(bounceArrivalVec.y); // Отражение от горизонтали
+            }
             double reflectionCoeff = RadioPhysics::getReflectionCoefficient(TileType::WALL, cosTheta, frequencyGHz);
             if (reflectionCoeff > 0.05) {
                 double finalBounceAtten = totalTransmittanceLOS * reflectionCoeff;
