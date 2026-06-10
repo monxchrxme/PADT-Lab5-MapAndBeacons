@@ -33,7 +33,7 @@ void runApplication()
     ImGuiIO& io = ImGui::GetIO();
     io.Fonts->Clear(); 
     io.Fonts->AddFontFromFileTTF("C:\\Windows\\Fonts\\arial.ttf", 18.0f, nullptr, io.Fonts->GetGlyphRangesCyrillic());
-    ImGui::SFML::UpdateFontTexture();
+   (void)ImGui::SFML::UpdateFontTexture();
 
     //Базовые переменные
     sf::Clock deltaClock;
@@ -139,25 +139,26 @@ void runApplication()
                     envManager->loadWorldFromDisk(); 
                     
                     environment = envManager;
-                    navigator = new Navigator(environment);
+                    navigator = nullptr;
                     currentState = AppState::SIMULATION;
                     errorMessage = "";
 
                     isCameraLocked = false; 
                     MapBounds bounds = envManager->getWorldBounds();
-                    float worldWidth = static_cast<float>(bounds.maxX - bounds.minX);
-                    float worldHeight = static_cast<float>(bounds.maxY - bounds.minY);
-                    float centerX = static_cast<float>(bounds.minX + worldWidth / 2.0f);
-                    float centerY = static_cast<float>(bounds.minY + worldHeight / 2.0f);
+                    if (bounds.maxX > bounds.minX) 
+                    {
+                        float worldWidth = static_cast<float>(bounds.maxX - bounds.minX);
+                        float worldHeight = static_cast<float>(bounds.maxY - bounds.minY);
+                        float centerX = static_cast<float>(bounds.minX + worldWidth / 2.0f);
+                        float centerY = static_cast<float>(bounds.minY + worldHeight / 2.0f);
+                        view.setCenter(centerX, centerY);
 
-                    view.setCenter(centerX, centerY);
-
-                    float zoomX = (worldWidth / window.getSize().x) * 1.1f;
-                    float zoomY = (worldHeight / window.getSize().y) * 1.1f;
-                    currentZoom = std::max(zoomX, zoomY); 
-                    
-                    view.setSize(window.getSize().x * currentZoom, window.getSize().y * currentZoom);
-
+                        float zoomX = (worldWidth / window.getSize().x) * 1.1f;
+                        float zoomY = (worldHeight / window.getSize().y) * 1.1f;
+                        currentZoom = std::max(zoomX, zoomY); 
+                        
+                        view.setSize(window.getSize().x * currentZoom, window.getSize().y * currentZoom);
+                    }
                 } catch (const EnvironmentException& e) 
                 {
                     errorMessage = e.what();

@@ -190,7 +190,11 @@ Tile EnvironmentManager::getTileAtWorldPos(Point2D p) const
     Chunk* chunk = getChunkAt(cx, cy);
     if (!chunk) 
     {
-        return Tile{};
+        Tile voidTile;
+        voidTile.type = TileType::WALL; 
+        voidTile.isPassable = false;
+        voidTile.transmittance = 0.0; 
+        return voidTile;
     }
     double modX = std::fmod(p.x, Chunk::CHUNK_SIZE * Chunk::TILE_SIZE);
     double modY = std::fmod(p.y, Chunk::CHUNK_SIZE * Chunk::TILE_SIZE);
@@ -224,13 +228,20 @@ void EnvironmentManager::triggerLazyGeneration(Point2D p)
             
             if (!getChunkAt(cx, cy)) 
             {
+                if (currentMode == Mode::LOAD_GAME) 
+                {
+                    continue;
+                }
                 Chunk* newChunk = new Chunk(cx, cy);
                 generateChunkData(newChunk);
                 activeChunks.append(newChunk);
             }
         }
     }
-    unloadDistantChunks(p, 15000.0);
+    if (currentMode != Mode::LOAD_GAME) 
+    {
+        unloadDistantChunks(p, 4000.0);
+    }
 }
 
 void EnvironmentManager::generateChunkData(Chunk* chunk) 

@@ -1,5 +1,6 @@
 #include "../include/MapRenderer.hpp"
 #include <algorithm>
+#include <cmath>
 
 void MapRenderer::render(sf::RenderWindow& window, const EnvironmentManager* envManager) const 
 {
@@ -118,9 +119,27 @@ void MapRenderer::render(sf::RenderWindow& window, const EnvironmentManager* env
     for (int i = 0; i < towers.get_length(); ++i) 
     {
         Point2D pos = towers[i]; 
-        towerBase.setPosition(static_cast<float>(pos.x), static_cast<float>(pos.y));
-        window.draw(towerBase);
-        towerLight.setPosition(static_cast<float>(pos.x), static_cast<float>(pos.y));
-        window.draw(towerLight);
+        int cx = static_cast<int>(std::floor(pos.x / (Chunk::CHUNK_SIZE * Chunk::TILE_SIZE)));
+        int cy = static_cast<int>(std::floor(pos.y / (Chunk::CHUNK_SIZE * Chunk::TILE_SIZE)));
+        
+        //Проверка, есть ли чанк под вышкой
+        bool hasChunk = false;
+        const auto& active = envManager->getActiveChunks();
+        for(int c = 0; c < active.get_length(); ++c) 
+        {
+            if(active[c]->getX() == cx && active[c]->getY() == cy) 
+            {
+                hasChunk = true;
+                break;
+            }
+        }
+        // Рисуем, только если чанк загружен
+        if (hasChunk) 
+        {
+            towerBase.setPosition(static_cast<float>(pos.x), static_cast<float>(pos.y));
+            window.draw(towerBase);
+            towerLight.setPosition(static_cast<float>(pos.x), static_cast<float>(pos.y));
+            window.draw(towerLight);
+        }
     }
 }
