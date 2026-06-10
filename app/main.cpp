@@ -108,7 +108,7 @@ void runSimulation() {
             std::cerr << "Environment Warning: " << e.what() << '\n';
         }
 
-        // ИНТЕРФЕЙС ImGui
+        // ИНТЕРФЕЙС ImGui 
         ImGui::Begin("Simulation Controls");
         ImGui::Text("FPS: %.1f", ImGui::GetIO().Framerate);
         ImGui::Separator();
