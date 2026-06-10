@@ -7,8 +7,18 @@
 #include "MathUtils.hpp"
 
 void TargetObject::setDirection(double dx, double dy) {
-    velocity_ = {dx, dy};
-    math::normalize(velocity_);
+    if (dx == 0.0 && dy == 0.0) {
+        velocity_ = {0.0, 0.0};
+        return;
+    }
+    //Сохраняем "силу" нажатия
+    double magnitude = std::sqrt(dx*dx + dy*dy);
+    
+    // Нормализуем направление
+    velocity_ = {dx / magnitude, dy / magnitude};
+    
+    velocity_.x *= magnitude;
+    velocity_.y *= magnitude;
 }
 
 void TargetObject::updateEstimation(const IEnvironment* env, const Sequence<MobileBeacon*>& activeBeacons) {
