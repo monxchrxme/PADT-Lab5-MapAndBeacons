@@ -37,9 +37,13 @@ public:
         x -= std::floor(x); y -= std::floor(y);
         float u = fade(static_cast<float>(x)); 
         float v = fade(static_cast<float>(y));
-        int A = hash(X, Y), B = hash(X + 1, Y); 
-        int C = hash(X, Y + 1), D = hash(X + 1, Y + 1);
-        return lerp(v, lerp(u, grad(A, (float)x, (float)y), grad(B, (float)x - 1, (float)y)), lerp(u, grad(C, (float)x, (float)y - 1), grad(D, (float)x - 1, (float)y - 1)));
+        int A = hash(X, Y);
+        int B = hash((X + 1) & 255, Y);
+        int C = hash(X, (Y + 1) & 255);
+        int D = hash((X + 1) & 255, (Y + 1) & 255);
+        
+        return lerp(v, lerp(u, grad(A, (float)x, (float)y), grad(B, (float)x - 1, (float)y)), 
+                       lerp(u, grad(C, (float)x, (float)y - 1), grad(D, (float)x - 1, (float)y - 1)));
     }
     static double get(double x, double y) 
     { 
@@ -191,9 +195,9 @@ Tile EnvironmentManager::getTileAtWorldPos(Point2D p) const
     if (!chunk) 
     {
         Tile voidTile;
-        voidTile.type = TileType::WALL; 
+        voidTile.type = TileType::EMPTY; 
         voidTile.isPassable = false;
-        voidTile.transmittance = 0.0; 
+        voidTile.transmittance = 1.0; 
         return voidTile;
     }
     double modX = std::fmod(p.x, Chunk::CHUNK_SIZE * Chunk::TILE_SIZE);
@@ -252,33 +256,37 @@ void EnvironmentManager::generateChunkData(Chunk* chunk)
     {
         for (int x = 0; x < Chunk::CHUNK_SIZE; ++x) 
         {
-            double gX = chunk->getX() * Chunk::CHUNK_SIZE + x;
-            double gY = chunk->getY() * Chunk::CHUNK_SIZE + y;
-            double nN = PerlinNoise::get(gX * scaleNature, gY * scaleNature);
-            double nP = PerlinNoise::get(gX * scalePath + 100.0, gY * scalePath + 100.0);
-            TileType type = TileType::EMPTY; 
+            double globalX = (chunk->getX() * Chunk::CHUNK_SIZE + x) + 0.5;
+            double globalY = (chunk->getY() * Chunk::CHUNK_SIZE + y) + 0.5;
+            double noiseNature = PerlinNoise::get(globalX * scaleNature, globalY * scaleNature);
+            double noisePath = PerlinNoise::get(globalX * scalePath + 100.0, globalY * scalePath + 100.0);
+
+            TileType type = TileType::EMPTY;
             int param = 0;
-            if (nN < 0.35) 
-            {
+
+            if (noiseNature < 0.35) 
+            { 
                 type = TileType::WATER;
-            }else if (nN > 0.55) 
+            } else if (noiseNature > 0.55) 
             { 
                 type = TileType::FOREST;
-                if (nN > 0.75) 
+                if (noiseNature > 0.75) 
                 {
-                    param = 3; 
-                }else if (nN > 0.65) 
+                    param = 3;
+                }else if (noiseNature > 0.65) 
                 {
                     param = 2; 
                 }else 
                 {
-                    param = 1;
-                }
+                    param = 1;  
+                }                       
             }
-            if (type != TileType::WATER && std::abs(nP - 0.5) < 0.015) 
+
+            if (type != TileType::WATER) 
             {
-                type = TileType::PATH;
+                if (std::abs(noisePath - 0.5) < 0.015) type = TileType::PATH; 
             }
+            
             chunk->setTile(x, y, type, param);
         }
     }
@@ -286,9 +294,9 @@ void EnvironmentManager::generateChunkData(Chunk* chunk)
     {
         for (int x = 3; x < Chunk::CHUNK_SIZE - 5; ++x) 
         {
-            double gX = chunk->getX() * Chunk::CHUNK_SIZE + x;
-            double gY = chunk->getY() * Chunk::CHUNK_SIZE + y;
-            if (PerlinNoise::randomPos(gX, gY) > 0.99) 
+            double globalX = (chunk->getX() * Chunk::CHUNK_SIZE + x) + 0.5;
+            double globalY = (chunk->getY() * Chunk::CHUNK_SIZE + y) + 0.5;
+            if (PerlinNoise::randomPos(globalX, globalY) > 0.99) 
             {
                 bool safe = true;
                 for(int dy = -3; dy <= 4; dy++) 
@@ -299,8 +307,9 @@ void EnvironmentManager::generateChunkData(Chunk* chunk)
                         }
                 if (safe) 
                 {
-                    int h = (PerlinNoise::hash(static_cast<int>(gX), static_cast<int>(gY)) % 6) + 1;
-                    int s = PerlinNoise::hash(static_cast<int>(gX*2), static_cast<int>(gY*2)) % 4;
+                    int h = (PerlinNoise::hash(static_cast<int>(globalX), static_cast<int>(globalY)) % 6) + 1;
+                    int s = PerlinNoise::hash(static_cast<int>(globalX*2), static_cast<int>(globalY*2)) % 4;
+                    
                     chunk->setTile(x, y, TileType::WALL, h); 
                     chunk->setTile(x+1, y, TileType::WALL, h);
                     if (s == 0) 

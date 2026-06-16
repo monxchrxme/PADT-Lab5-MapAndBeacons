@@ -89,10 +89,9 @@ void runApplication()
                 {
                     if (!ImGui::GetIO().WantCaptureMouse) 
                     { 
-                        isCameraLocked = false; 
                         lastMousePos = sf::Mouse::getPosition(window);
                     }
-                }
+                }   
             }
         }
 
@@ -123,6 +122,8 @@ void runApplication()
                     currentState = AppState::SIMULATION;
                     errorMessage = "";
                     currentZoom = 1.0f; 
+                    isCameraLocked = true;
+                    view.setSize(window.getSize().x * currentZoom, window.getSize().y * currentZoom); 
                 } catch (const std::exception& e) 
                 {
                     errorMessage = e.what();
@@ -180,34 +181,51 @@ void runApplication()
 
         } else if (currentState == AppState::SIMULATION) 
         {
-            if (!isCameraLocked && sf::Mouse::isButtonPressed(sf::Mouse::Left)) 
+            if (sf::Mouse::isButtonPressed(sf::Mouse::Left) && !ImGui::GetIO().WantCaptureMouse) 
             {
                 sf::Vector2i newMousePos = sf::Mouse::getPosition(window);
-                sf::Vector2f delta = window.mapPixelToCoords(lastMousePos, view) - window.mapPixelToCoords(newMousePos, view);
-                view.move(delta);
-                lastMousePos = newMousePos;
-            }
-            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Space)) 
-            {
-                isCameraLocked = true;
-            }
+                int moveDistSq = (newMousePos.x - lastMousePos.x)*(newMousePos.x - lastMousePos.x) + 
+                                 (newMousePos.y - lastMousePos.y)*(newMousePos.y - lastMousePos.y);
+                
+                if (moveDistSq > 25) 
+                {
+                    isCameraLocked = false; 
+                }
 
+                //Если камера отвязана, сдвигаем её
+                if (!isCameraLocked) 
+                {
+                    sf::Vector2f delta = window.mapPixelToCoords(lastMousePos, view) - window.mapPixelToCoords(newMousePos, view);
+                    view.move(delta);
+                }
+                lastMousePos = newMousePos; 
+            }
+            //Бег и управление
             double dx = 0.0; double dy = 0.0;
+            bool isMoving = false;
             if (sf::Keyboard::isKeyPressed(sf::Keyboard::W) || sf::Keyboard::isKeyPressed(sf::Keyboard::Up))    
             {
                 dy -= 1.0;
+                isMoving = true;
             }
             if (sf::Keyboard::isKeyPressed(sf::Keyboard::S) || sf::Keyboard::isKeyPressed(sf::Keyboard::Down))  
             {
                 dy += 1.0;
+                isMoving = true;
             }
             if (sf::Keyboard::isKeyPressed(sf::Keyboard::A) || sf::Keyboard::isKeyPressed(sf::Keyboard::Left))  
             {
                 dx -= 1.0;
+                isMoving = true;
             }
             if (sf::Keyboard::isKeyPressed(sf::Keyboard::D) || sf::Keyboard::isKeyPressed(sf::Keyboard::Right)) 
             {
                 dx += 1.0;
+                isMoving = true;
+            }
+            if (isMoving || sf::Keyboard::isKeyPressed(sf::Keyboard::Space)) 
+            {
+                isCameraLocked = true;
             }
             if (sf::Keyboard::isKeyPressed(sf::Keyboard::LShift) || sf::Keyboard::isKeyPressed(sf::Keyboard::RShift)) 
             {
