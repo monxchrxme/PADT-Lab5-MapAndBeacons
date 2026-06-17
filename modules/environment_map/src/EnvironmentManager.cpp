@@ -434,6 +434,12 @@ MutableArraySequence<RadioPath> EnvironmentManager::computePaths(Point2D tx, Poi
     bool hitWall = false; 
     Point2D virtualTx = {0.0, 0.0};
 
+    bool isVerticalWall = false; 
+    double wallPlaneCoord = 0.0;
+
+    double wallMinBound = 0.0;
+    double wallMaxBound = 0.0;
+
     while (true) 
     {
         Tile t = getTileAtWorldPos({ x0 * Chunk::TILE_SIZE, y0 * Chunk::TILE_SIZE });
@@ -443,11 +449,19 @@ MutableArraySequence<RadioPath> EnvironmentManager::computePaths(Point2D tx, Poi
             hitWall = true;
             if (dx > std::abs(dy)) 
             {
-                double wX = (sx > 0) ? x0 * Chunk::TILE_SIZE : (x0 + 1) * Chunk::TILE_SIZE;
-                virtualTx = { wX + (wX - tx.x), tx.y };
+                isVerticalWall = true;
+                wallPlaneCoord = (sx > 0) ? x0 * Chunk::TILE_SIZE : (x0 + 1) * Chunk::TILE_SIZE;
+                virtualTx = { wallPlaneCoord + (wallPlaneCoord - tx.x), tx.y };
+                // Запоминаем границы стены по оси Y
+                wallMinBound = y0 * Chunk::TILE_SIZE;
+                wallMaxBound = (y0 + 1) * Chunk::TILE_SIZE;
             } else {
-                double wY = (sy > 0) ? y0 * Chunk::TILE_SIZE : (y0 + 1) * Chunk::TILE_SIZE;
-                virtualTx = { tx.x, wY + (wY - tx.y) };
+                isVerticalWall = false;
+                wallPlaneCoord = (sy > 0) ? y0 * Chunk::TILE_SIZE : (y0 + 1) * Chunk::TILE_SIZE;
+                virtualTx = { tx.x, wallPlaneCoord + (wallPlaneCoord - tx.y) };
+                // Запоминаем границы стены по оси X
+                wallMinBound = x0 * Chunk::TILE_SIZE;
+                wallMaxBound = (x0 + 1) * Chunk::TILE_SIZE;
             }
         }
         if (totalTransmittance < 0.001 || (x0 == x1 && y0 == y1)) 
@@ -467,23 +481,36 @@ MutableArraySequence<RadioPath> EnvironmentManager::computePaths(Point2D tx, Poi
 
     if (totalTransmittance >= 0.001) 
     {
-        paths.append(RadioPath{ distLOS, arrivalVec, totalTransmittance, 0 });
+        // Прямой луч (bouncePoint совпадает с rx, так как удара о стену нет)
+        paths.append(RadioPath{ tx, rx, distLOS, arrivalVec, totalTransmittance, 0, PathType::LOS });
     }
 
+    // Отражение от земли
     double distGround = std::sqrt(distLOS * distLOS + (10.0 + 2.0) * (10.0 + 2.0));
-    paths.append(RadioPath{ distGround, arrivalVec, totalTransmittance * 0.7, 1 });
+    paths.append(RadioPath{ tx, rx, distGround, arrivalVec, totalTransmittance * 0.7, 1, PathType::GROUND}); 
 
+    // Отражение от стены
     if (hitWall) 
     {
         double dBounce = std::hypot(rx.x - virtualTx.x, rx.y - virtualTx.y);
         if (dBounce > 1.0) 
         {
             Point2D bAV = { (rx.x - virtualTx.x) / dBounce, (rx.y - virtualTx.y) / dBounce };
-            double cosTheta = (dx > std::abs(dy)) ? std::abs(bAV.x) : std::abs(bAV.y);
+            double cosTheta = isVerticalWall ? std::abs(bAV.x) : std::abs(bAV.y);
             double rCoeff = RadioPhysics::getReflectionCoefficient(TileType::WALL, cosTheta, frequencyGHz);
             if (rCoeff > 0.05) 
             {
-                paths.append(RadioPath{ dBounce, bAV, totalTransmittance * rCoeff, 1 });
+                // Ищем точную точку удара о стену (Уравнение пересечения прямых)
+                Point2D bouncePoint;
+                if (isVerticalWall) {
+                    double t_param = (wallPlaneCoord - virtualTx.x) / (rx.x - virtualTx.x);
+                    bouncePoint = { wallPlaneCoord, virtualTx.y + t_param * (rx.y - virtualTx.y) };
+                } else {
+                    double t_param = (wallPlaneCoord - virtualTx.y) / (rx.y - virtualTx.y);
+                    bouncePoint = { virtualTx.x + t_param * (rx.x - virtualTx.x), wallPlaneCoord };
+                }
+
+                paths.append(RadioPath{ tx, bouncePoint, dBounce, bAV, totalTransmittance * rCoeff, 1, PathType::WALL });
             }
         }
     }

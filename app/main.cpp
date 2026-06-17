@@ -272,6 +272,7 @@ void runApplication()
             ImGui::Checkbox("Показать Mesh-сеть", &g_Settings.showMeshNetwork);
             ImGui::SliderFloat("Радиус связи (Mesh)", &g_Settings.meshCommRadius, 50.0f, 800.0f, "%.0f");
             ImGui::Checkbox("Показать лучи пеленгации (AoA)", &g_Settings.showAoARays); 
+            ImGui::Checkbox("Показать переотражения (ISM)", &g_Settings.showMultipathRays);
 
             ImGui::Separator();
 

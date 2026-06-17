@@ -9,7 +9,48 @@ void NavigationRenderer::render(sf::RenderWindow& window, const INavigator* navi
     if (!navigator || !env) return;
 
     // Лямбда функция для отрисовки динамических сущностей
-    auto drawEntity = [&](Point2D realPos, LocationResult est, sf::Color color, const Sequence<ProcessedSignal>& signals) {
+    auto drawEntity = [&](Point2D realPos, LocationResult est, sf::Color color, 
+        const Sequence<ProcessedSignal>& signals, const Sequence<RadioPath>& physPaths) {
+
+        // Отрисовка лучей с отражениями (Multipath Bounces)
+        if (g_Settings.showMultipathRays) {
+            for (int p = 0; p < physPaths.get_length(); ++p) {
+                RadioPath path = physPaths[p];
+                
+                if (path.type == PathType::LOS) {
+                    // Прямой луч (Полупрозрачный белый)
+                    sf::Vertex ray[] = {
+                        sf::Vertex(sf::Vector2f(path.txPos.x, path.txPos.y), sf::Color(255, 255, 255, 40)),
+                        sf::Vertex(sf::Vector2f(realPos.x, realPos.y), sf::Color(255, 255, 255, 40))
+                    };
+                    window.draw(ray, 2, sf::Lines);
+                } 
+                else if (path.type == PathType::WALL) {
+                    // Отраженный луч (V-образный излом)
+                    // 1. От вышки до стены (Яркий фиолетовый - полная энергия)
+                    sf::Vertex ray1[] = {
+                        sf::Vertex(sf::Vector2f(path.txPos.x, path.txPos.y), sf::Color(255, 100, 255, 200)),
+                        sf::Vertex(sf::Vector2f(path.bouncePoint.x, path.bouncePoint.y), sf::Color(255, 100, 255, 200))
+                    };
+                    window.draw(ray1, 2, sf::Lines);
+
+                    // 2. От стены до объекта (Тусклый фиолетовый - часть энергии впитала стена)
+                    sf::Vertex ray2[] = {
+                        sf::Vertex(sf::Vector2f(path.bouncePoint.x, path.bouncePoint.y), sf::Color(255, 100, 255, 200)),
+                        sf::Vertex(sf::Vector2f(realPos.x, realPos.y), sf::Color(255, 100, 255, 40))
+                    };
+                    window.draw(ray2, 2, sf::Lines);
+                    
+                    // Рисуем точку удара о бетон
+                    sf::CircleShape bounceDot(3.0f);
+                    bounceDot.setOrigin(3.0f, 3.0f);
+                    bounceDot.setPosition(path.bouncePoint.x, path.bouncePoint.y);
+                    bounceDot.setFillColor(sf::Color::White);
+                    window.draw(bounceDot);
+                }
+            }
+        }
+
         // Отрисовка зоны погрешности (Вычисленная позиция)
         // минимальный визуал 2 пикселя даже при идеальной точности
         float radius = std::max(2.0f, static_cast<float>(est.errorRadius));
@@ -56,7 +97,8 @@ void NavigationRenderer::render(sf::RenderWindow& window, const INavigator* navi
     for (int i = 0; i < beacons.get_length(); ++i) {
         const MobileBeacon* beacon = beacons[i];
         if (beacon) {
-            drawEntity(beacon->getRealPosition(), beacon->getEstimation(), sf::Color(100, 150, 255), beacon->getLastSignals());
+            drawEntity(beacon->getRealPosition(), beacon->getEstimation(), sf::Color(100, 150, 255), 
+            beacon->getLastSignals(), beacon->getLastPhysicalPaths());
         }
     }
 
@@ -64,7 +106,8 @@ void NavigationRenderer::render(sf::RenderWindow& window, const INavigator* navi
     const TargetObject* target = navigator->getTarget();
     if (target) {
         
-        drawEntity(target->getRealPosition(), target->getEstimation(), sf::Color::Red, target->getLastSignals());
+        drawEntity(target->getRealPosition(), target->getEstimation(), sf::Color::Red, 
+        target->getLastSignals(), target->getLastPhysicalPaths());
     }
 
     // 4. Отрисовка Mesh-сети (Лазерные линии передачи) 

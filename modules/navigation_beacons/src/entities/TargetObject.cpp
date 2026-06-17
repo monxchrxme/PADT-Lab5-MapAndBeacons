@@ -24,13 +24,27 @@ void TargetObject::setDirection(double dx, double dy) {
 void TargetObject::updateEstimation(const IEnvironment* env, const Sequence<MobileBeacon*>& activeBeacons) {
     if (!env) return;
 
+    // Очищаем старые пути каждый кадр
+    lastPhysicalPaths_ = MutableArraySequence<RadioPath>();
+
     MutableArraySequence<ProcessedSignal> allSignals;
 
     // Сбор данных от стационарных вышек 
     MutableArraySequence<Point2D> staticTowers = env->getStaticTowers();
+    // Вычисляем радиус, дальше которого сигнал от вышки будет ниже установленной погрешности
+    double maxHearingRadius = std::sqrt(g_Settings.baseTxPower / g_Settings.signalThreshold);
+    if (maxHearingRadius > 1000.0) {
+        maxHearingRadius = 1000.0; 
+    }
     for (int i = 0; i < staticTowers.get_length(); ++i) {
         Point2D towerPos = staticTowers[i];
+        if (math::distance(realPosition_, towerPos) > maxHearingRadius) {
+            continue; 
+        }
         auto paths = env->computePaths(towerPos, realPosition_, g_Settings.frequencyGHz);
+        for(int p = 0; p < paths.get_length(); ++p) {
+            lastPhysicalPaths_.append(paths[p]);
+        }
         ProcessedSignal sig = SignalProcessor::processPaths(paths, towerPos, g_Settings.frequencyGHz);
 
         if (sig.rssi > g_Settings.signalThreshold) {
@@ -46,6 +60,9 @@ void TargetObject::updateEstimation(const IEnvironment* env, const Sequence<Mobi
         LocationResult beaconEst = beacon->getEstimation();
         // Сигнал отправялется от реальной позиции маяка
         auto paths = env->computePaths(beacon->getRealPosition(), realPosition_, g_Settings.frequencyGHz);
+        for(int p = 0; p < paths.get_length(); ++p) {
+            lastPhysicalPaths_.append(paths[p]);
+        }
         ProcessedSignal sig = SignalProcessor::processPaths(paths, beacon->getEstimation().estimatedPos, g_Settings.frequencyGHz);
 
         // Маяки передают слабее вышек 

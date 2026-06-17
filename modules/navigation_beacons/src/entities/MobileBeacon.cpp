@@ -22,7 +22,10 @@ void MobileBeacon::updatePhysics(float dt, const IEnvironment* env) {
 void MobileBeacon::updateEstimation(const IEnvironment* env, const Sequence<MobileBeacon*>& activeBeacons) {
     if (!env) return;
 
-    // 1. Опрос СТАЦИОНАРНЫХ ВЫШЕК (Безусловное доверие)
+    // Очищаем старые пути каждый кадр
+    lastPhysicalPaths_ = MutableArraySequence<RadioPath>();
+
+    // 1. Опрос Стационарных вышек  (Безусловное доверие)
 
     // Получаем вышки по значению 
     MutableArraySequence<Point2D> staticTowers = env->getStaticTowers();
@@ -31,10 +34,21 @@ void MobileBeacon::updateEstimation(const IEnvironment* env, const Sequence<Mobi
 
     // pipeline сбора данных
 
+    // Вычисляем радиус, дальше которого сигнал от вышки будет ниже установленной погрешности
+    double maxHearingRadius = std::sqrt(g_Settings.baseTxPower / g_Settings.signalThreshold);
+    if (maxHearingRadius > 1000.0) {
+        maxHearingRadius = 1000.0; 
+    }
     for (int i = 0; i < staticTowers.get_length(); ++i) {
         Point2D towerPos = staticTowers[i];
+        if (math::distance(realPosition_, towerPos) > maxHearingRadius) {
+            continue; 
+        }
         // Запрашиваем пути у Карты на текущей частоте
         auto paths = env->computePaths(towerPos, realPosition_, g_Settings.frequencyGHz);
+        for(int p = 0; p < paths.get_length(); ++p) {
+            lastPhysicalPaths_.append(paths[p]);
+        }
         // Пропускаем пути через DSP-процессор (считаем фазы, азимут, интерференцию)
         ProcessedSignal sig = SignalProcessor::processPaths(paths, towerPos, g_Settings.frequencyGHz);
         if (sig.rssi > g_Settings.signalThreshold) {
@@ -42,7 +56,7 @@ void MobileBeacon::updateEstimation(const IEnvironment* env, const Sequence<Mobi
         }
     }
 
-    // 2. КООПЕРАТИВНАЯ ЛОКАЛИЗАЦИЯ (Маяки помогают друг другу) 
+    // 2. Кооперативная Локализация (Маяки помогают друг другу) 
     for (int i = 0; i < activeBeacons.get_length(); ++i) {
         const MobileBeacon* other = activeBeacons[i];
         // Самого себя не опрашиваем
@@ -50,6 +64,9 @@ void MobileBeacon::updateEstimation(const IEnvironment* env, const Sequence<Mobi
 
         LocationResult otherEst = other->getEstimation();
         auto paths = env->computePaths(other->getRealPosition(), realPosition_, g_Settings.frequencyGHz);
+        for(int p = 0; p < paths.get_length(); ++p) {
+            lastPhysicalPaths_.append(paths[p]);
+        }
         ProcessedSignal sig = SignalProcessor::processPaths(paths, otherEst.estimatedPos, g_Settings.frequencyGHz);
 
         if (sig.rssi > g_Settings.signalThreshold * 2.0) {
@@ -89,7 +106,7 @@ void MobileBeacon::updateEstimation(const IEnvironment* env, const Sequence<Mobi
     }
 }
 
-// СЕТЕВАЯ МАРШРУТИЗАЦИЯ (Flooding) 
+// Сетевая Мартшрутизация (Flooding) 
 
 void MobileBeacon::receivePacket(const MeshPacket& packet) {
     // 1. проверяем видели ли мы уже этот пакет

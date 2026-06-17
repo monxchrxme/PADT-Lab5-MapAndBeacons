@@ -13,6 +13,9 @@ protected:
     LocationResult estimation_; // Вычисленные координаты и радиус ошибки
     float speed_;               // Скалярная скорость
 
+    // Память для отрисовки лучей с отражениями 
+    MutableArraySequence<RadioPath> lastPhysicalPaths_;
+
     // Сохраняем последние обработанные сигналы
     MutableArraySequence<ProcessedSignal> lastSignals_; 
 
@@ -45,4 +48,5 @@ public:
     [[nodiscard]] Point2D getVelocity() const { return velocity_; }
     [[nodiscard]] LocationResult getEstimation() const { return estimation_; }
     [[nodiscard]] const Sequence<ProcessedSignal>& getLastSignals() const { return lastSignals_; }
+    [[nodiscard]] const Sequence<RadioPath>& getLastPhysicalPaths() const { return lastPhysicalPaths_; }
 };
