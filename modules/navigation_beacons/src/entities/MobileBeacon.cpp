@@ -36,8 +36,8 @@ void MobileBeacon::updateEstimation(const IEnvironment* env, const Sequence<Mobi
 
     // Вычисляем радиус, дальше которого сигнал от вышки будет ниже установленной погрешности
     double maxHearingRadius = std::sqrt(g_Settings.baseTxPower / g_Settings.signalThreshold);
-    if (maxHearingRadius > 1000.0) {
-        maxHearingRadius = 1000.0; 
+    if (maxHearingRadius > 1500.0) {
+        maxHearingRadius = 1500.0; 
     }
     for (int i = 0; i < staticTowers.get_length(); ++i) {
         Point2D towerPos = staticTowers[i];

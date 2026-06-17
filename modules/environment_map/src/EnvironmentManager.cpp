@@ -489,28 +489,44 @@ MutableArraySequence<RadioPath> EnvironmentManager::computePaths(Point2D tx, Poi
     double distGround = std::sqrt(distLOS * distLOS + (10.0 + 2.0) * (10.0 + 2.0));
     paths.append(RadioPath{ tx, rx, distGround, arrivalVec, totalTransmittance * 0.7, 1, PathType::GROUND}); 
 
-    // Отражение от стены
+    // Отражение от стены (Wall Bounce - ISM) 
     if (hitWall) 
     {
         double dBounce = std::hypot(rx.x - virtualTx.x, rx.y - virtualTx.y);
         if (dBounce > 1.0) 
         {
-            Point2D bAV = { (rx.x - virtualTx.x) / dBounce, (rx.y - virtualTx.y) / dBounce };
-            double cosTheta = isVerticalWall ? std::abs(bAV.x) : std::abs(bAV.y);
-            double rCoeff = RadioPhysics::getReflectionCoefficient(TileType::WALL, cosTheta, frequencyGHz);
-            if (rCoeff > 0.05) 
+            // Ищем точку удара
+            Point2D bouncePoint;
+            if (isVerticalWall) {
+                double t_param = (wallPlaneCoord - virtualTx.x) / (rx.x - virtualTx.x);
+                bouncePoint = { wallPlaneCoord, virtualTx.y + t_param * (rx.y - virtualTx.y) };
+            } else {
+                double t_param = (wallPlaneCoord - virtualTx.y) / (rx.y - virtualTx.y);
+                bouncePoint = { virtualTx.x + t_param * (rx.x - virtualTx.x), wallPlaneCoord };
+            }
+            // проверка, ударились ли мы в пределы нашего квадратного тайла
+            bool validBounce = false;
+            if (isVerticalWall && bouncePoint.y >= wallMinBound && bouncePoint.y <= wallMaxBound) 
             {
-                // Ищем точную точку удара о стену (Уравнение пересечения прямых)
-                Point2D bouncePoint;
-                if (isVerticalWall) {
-                    double t_param = (wallPlaneCoord - virtualTx.x) / (rx.x - virtualTx.x);
-                    bouncePoint = { wallPlaneCoord, virtualTx.y + t_param * (rx.y - virtualTx.y) };
-                } else {
-                    double t_param = (wallPlaneCoord - virtualTx.y) / (rx.y - virtualTx.y);
-                    bouncePoint = { virtualTx.x + t_param * (rx.x - virtualTx.x), wallPlaneCoord };
+                validBounce = true;
+            }
+            if (!isVerticalWall && bouncePoint.x >= wallMinBound && bouncePoint.x <= wallMaxBound) 
+            {
+                validBounce = true;
+            }
+            // Если удар честный считаем потерю энергии
+            if (validBounce) {
+                Point2D bAV = { (rx.x - virtualTx.x) / dBounce, (rx.y - virtualTx.y) / dBounce };
+                double cosTheta = isVerticalWall ? std::abs(bAV.x) : std::abs(bAV.y);
+                double rCoeff = RadioPhysics::getReflectionCoefficient(TileType::WALL, cosTheta, frequencyGHz);
+                
+                if (rCoeff > 0.05) 
+                {
+                    double finalBounceAtten = totalTransmittance * rCoeff;
+                    if (finalBounceAtten > 0.001) {
+                        paths.append(RadioPath{ tx, bouncePoint, dBounce, bAV, finalBounceAtten, 1, PathType::WALL });
+                    }
                 }
-
-                paths.append(RadioPath{ tx, bouncePoint, dBounce, bAV, totalTransmittance * rCoeff, 1, PathType::WALL });
             }
         }
     }
