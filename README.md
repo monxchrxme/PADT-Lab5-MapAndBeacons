@@ -6,9 +6,7 @@
 
 Компилятор C++23 (MSVC, GCC 10+, Clang 12+)
 
-### 1. Конфигурация
-
-**1. Конфигурация и сборка проекта**
+### 1. Конфигурация и сборка проекта
 
 ```bash
 # Клонирование репозитория
@@ -105,3 +103,5 @@ cmake --build build --config Release
 ├── README.md                             # Документация проекта
 └── world_save.bin                        # Файл сохранения состояния мира
 ```
+
+![Simulation Settings Window](images/Simulation_settings_windows.png)
