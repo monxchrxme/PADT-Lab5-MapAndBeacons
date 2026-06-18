@@ -9,6 +9,11 @@ struct MapBounds
     double minX, minY, maxX, maxY;
 };
 
+struct ChunkCoord 
+{
+    int x, y;
+};
+
 class EnvironmentManager final : public IEnvironment 
 {
 public:
@@ -23,7 +28,9 @@ private:
     Mode currentMode;
     MutableArraySequence<Chunk*> activeChunks;
     MutableArraySequence<Point2D> staticTowers;
-
+    MutableArraySequence<ChunkCoord> exploredChunksHistory;
+    
+    [[nodiscard]] bool isChunkInHistory(int cx, int cy) const;
     [[nodiscard]] Chunk* getChunkAt(int chunkX, int chunkY) const;
     [[nodiscard]] Tile getTileAtWorldPos(Point2D p) const;
     void generateChunkData(Chunk* chunk);

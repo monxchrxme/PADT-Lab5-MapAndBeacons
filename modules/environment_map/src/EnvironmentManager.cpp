@@ -67,46 +67,46 @@ EnvironmentManager::~EnvironmentManager()
     }
 }
 
+bool EnvironmentManager::isChunkInHistory(int cx, int cy) const 
+{
+    for (int i = 0; i < exploredChunksHistory.get_length(); ++i) 
+    {
+        if (exploredChunksHistory[i].x == cx && exploredChunksHistory[i].y == cy) 
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
 //Работа с диском (world_save.bin)
 void EnvironmentManager::saveWorldToDisk() const 
 {
     FILE* file = std::fopen("world_save.bin", "wb");
-    if (!file) 
-    {
-        return;
-    }
-    //Запись чанков
-    int chunkCount = activeChunks.get_length();
-    std::fwrite(&chunkCount, sizeof(int), 1, file);
-
-    for (int i = 0; i < chunkCount; ++i) 
-    {
-        Chunk* c = activeChunks[i];
-        int cx = c->getX(), cy = c->getY();
-        std::fwrite(&cx, sizeof(int), 1, file);
-        std::fwrite(&cy, sizeof(int), 1, file);
-
-        for (int y = 0; y < Chunk::CHUNK_SIZE; ++y) 
+        if (!file) 
         {
-            for (int x = 0; x < Chunk::CHUNK_SIZE; ++x) 
-            {
-                Tile t = c->getTile(x, y);
-                std::fwrite(&t, sizeof(Tile), 1, file);
-            }
+            return;
         }
-    }
+        //Сохраняем Вышки
+        int towerCount = staticTowers.get_length();
+        std::fwrite(&towerCount, sizeof(int), 1, file); 
+        
+        for (int i = 0; i < towerCount; ++i) 
+        {
+            Point2D pos = staticTowers[i];
+            std::fwrite(&pos, sizeof(Point2D), 1, file); 
+        }
 
-    //Запись вышек
-    int towerCount = staticTowers.get_length();
-    std::fwrite(&towerCount, sizeof(int), 1, file); 
-    
-    for (int i = 0; i < towerCount; ++i) 
-    {
-        Point2D pos = staticTowers[i];
-        std::fwrite(&pos, sizeof(Point2D), 1, file); 
-    }
+        //Сохраняем координаты посещенных чанков
+        int historyCount = exploredChunksHistory.get_length();
+        std::fwrite(&historyCount, sizeof(int), 1, file);
+        
+        for (int i = 0; i < historyCount; ++i) 
+        {
+            std::fwrite(&exploredChunksHistory[i], sizeof(ChunkCoord), 1, file);
+        }
 
-    std::fclose(file);
+        std::fclose(file);
 }
 
 void EnvironmentManager::loadWorldFromDisk() 
@@ -114,34 +114,10 @@ void EnvironmentManager::loadWorldFromDisk()
     FILE* file = std::fopen("world_save.bin", "rb");
     if (!file) 
     {
-        //Ошибка, если нажать "Загрузить", а файла нет
-        throw EnvironmentException("No saved world found! (world_save.bin is missing)");
+        throw EnvironmentException("No saved world found (world_save.bin is missing)");
     }
 
-    //Чтение чанков
-    int chunkCount = 0;
-    std::fread(&chunkCount, sizeof(int), 1, file);
-
-    for (int i = 0; i < chunkCount; ++i) 
-    {
-        int cx, cy;
-        std::fread(&cx, sizeof(int), 1, file);
-        std::fread(&cy, sizeof(int), 1, file);
-
-        Chunk* chunk = new Chunk(cx, cy);
-        for (int y = 0; y < Chunk::CHUNK_SIZE; ++y) 
-        {
-            for (int x = 0; x < Chunk::CHUNK_SIZE; ++x) 
-            {
-                Tile t;
-                std::fread(&t, sizeof(Tile), 1, file);
-                chunk->setTile(x, y, t.type, t.height);
-            }
-        }
-        activeChunks.append(chunk);
-    }
-
-    //Чтение вышек
+    //Читаем вышки
     int towerCount = 0;
     if (std::fread(&towerCount, sizeof(int), 1, file) == 1) 
     {
@@ -150,6 +126,22 @@ void EnvironmentManager::loadWorldFromDisk()
             Point2D pos;
             std::fread(&pos, sizeof(Point2D), 1, file);
             staticTowers.append(pos); 
+        }
+    }
+
+    int historyCount = 0;
+    if (std::fread(&historyCount, sizeof(int), 1, file) == 1) 
+    {
+        for (int i = 0; i < historyCount; ++i) 
+        {
+            ChunkCoord coord;
+            std::fread(&coord, sizeof(ChunkCoord), 1, file);
+            exploredChunksHistory.append(coord);
+
+            //Генерация сохраненного чанка 
+            Chunk* chunk = new Chunk(coord.x, coord.y);
+            generateChunkData(chunk);
+            activeChunks.append(chunk);
         }
     }
     std::fclose(file);
@@ -239,6 +231,14 @@ void EnvironmentManager::triggerLazyGeneration(Point2D p)
                 Chunk* newChunk = new Chunk(cx, cy);
                 generateChunkData(newChunk);
                 activeChunks.append(newChunk);
+
+                if (!isChunkInHistory(cx, cy)) 
+                {
+                    ChunkCoord newCoord;
+                    newCoord.x = cx;
+                    newCoord.y = cy;
+                    exploredChunksHistory.append(newCoord);
+                }
             }
         }
     }
@@ -351,17 +351,35 @@ void EnvironmentManager::generateChunkData(Chunk* chunk)
                         }
                 if (noWalls) 
                 {
-                    if (staticTowers.get_length() < 3 || PerlinNoise::randomPos(chunk->getX()+x, chunk->getY()+y) > 0.98) 
-                    {
-                        Point2D tp = { (chunk->getX() * Chunk::CHUNK_SIZE + x) * Chunk::TILE_SIZE + Chunk::TILE_SIZE, 
-                                      (chunk->getY() * Chunk::CHUNK_SIZE + y) * Chunk::TILE_SIZE + Chunk::TILE_SIZE };
-                        staticTowers.append(tp);
-                        chunk->setTile(x, y, TileType::TOWER_BASE, 0); 
-                        chunk->setTile(x+1, y, TileType::TOWER_BASE, 0);
-                        chunk->setTile(x, y+1, TileType::TOWER_BASE, 0); 
-                        chunk->setTile(x+1, y+1, TileType::TOWER_BASE, 0);
-                        spawned = true; 
-                    }
+                    if (PerlinNoise::randomPos(chunk->getX()+x, chunk->getY()+y) > 0.98) 
+                        {
+                            Point2D tp;
+                            tp.x = (chunk->getX() * Chunk::CHUNK_SIZE + x) * Chunk::TILE_SIZE + Chunk::TILE_SIZE;
+                            tp.y = (chunk->getY() * Chunk::CHUNK_SIZE + y) * Chunk::TILE_SIZE + Chunk::TILE_SIZE;
+                            
+                            bool towerExists = false;
+                            for(int i = 0; i < staticTowers.get_length(); ++i) 
+                            {
+                                double dx = staticTowers[i].x - tp.x;
+                                double dy = staticTowers[i].y - tp.y;
+                                if((dx * dx + dy * dy) < 1.0) 
+                                {
+                                    towerExists = true;
+                                    break;
+                                }
+                            }
+
+                            if (!towerExists && currentMode != Mode::LOAD_GAME) 
+                            {
+                                staticTowers.append(tp);
+                            }
+
+                            chunk->setTile(x, y, TileType::TOWER_BASE, 0); 
+                            chunk->setTile(x+1, y, TileType::TOWER_BASE, 0);
+                            chunk->setTile(x, y+1, TileType::TOWER_BASE, 0); 
+                            chunk->setTile(x+1, y+1, TileType::TOWER_BASE, 0);
+                            spawned = true; 
+                        }
                 }
             }
         }
