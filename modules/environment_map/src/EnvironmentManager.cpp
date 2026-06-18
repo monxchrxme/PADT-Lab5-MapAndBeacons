@@ -477,7 +477,7 @@ MutableArraySequence<RadioPath> EnvironmentManager::computePaths(Point2D tx, Poi
             }
 
             double tileWorldX = (rx_tx + dx_grid) * Chunk::TILE_SIZE;
-            double tileWorldY = (rx_ty + dy_grid) * Chunk::TILE_SIZE;
+            double tileWorldY = (rx_ty + dy_grid) * Chunk::TILE_SIZE; 
             
             // Проверяем центр тайла на наличие стены
             Tile t = getTileAtWorldPos({ tileWorldX + Chunk::TILE_SIZE / 2.0, tileWorldY + Chunk::TILE_SIZE / 2.0 });
