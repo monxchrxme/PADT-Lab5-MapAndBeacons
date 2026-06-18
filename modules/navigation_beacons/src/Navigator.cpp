@@ -21,7 +21,7 @@ Navigator::~Navigator() {
 }
 
 void Navigator::checkAndSpawnBeacons() {
-    const double SECTOR_SIZE = 1200.0; // Размер одного сектора спавна
+    const double SECTOR_SIZE = 1500.0; // Размер одного сектора спавна
     
     Point2D targetPos = target_->getRealPosition();
     int currentSectorX = static_cast<int>(std::floor(targetPos.x / SECTOR_SIZE));
@@ -79,9 +79,18 @@ void Navigator::updateEntities(float dt) {
     }
     activeLinks_ = aliveLinks;
 
+    // Радиус в котором маяки живут, все что дальше - засыпает (для экономии CPU)
+    const double ACTIVE_RADIUS = 1200.0; 
+
     // 1. Обновляем все мобильные маяки 
     for (int i = 0; i < beacons_.get_length(); ++i) {
         MobileBeacon* beacon = beacons_[i];
+
+        // Hibernation: Если маяк слишком далеко от Главной Цели - пропускаем
+        if (math::distance(target_->getRealPosition(), beacon->getRealPosition()) > ACTIVE_RADIUS) {
+            continue; 
+        }
+
         // Маяк шагает
         beacon->updatePhysics(dt, environment_);
         try {
@@ -101,7 +110,7 @@ void Navigator::updateEntities(float dt) {
         // Игнорируем потерю сигнала у главной цели
     }
 
-    // 3. ГЕНЕРАЦИЯ ПАКЕТОВ (Главная Цель транслируется в эфир)
+    // 3. Генерация пакетов  (Главная Цель транслируется в эфир)
     timeSinceLastPacket_ += dt;
     if (timeSinceLastPacket_ > 0.5f) {
         timeSinceLastPacket_ = 0.0f;
@@ -112,13 +121,13 @@ void Navigator::updateEntities(float dt) {
         for (int i = 0; i < beacons_.get_length(); ++i) {
             if (math::distance(target_->getRealPosition(), beacons_[i]->getRealPosition()) < g_Settings.meshCommRadius) {
                 beacons_[i]->receivePacket(newPacket);
-                // ЖЕЛТАЯ СВЯЗЬ: Target -> Beacon
+                // Желтая связь: Target -> Beacon
                 activeLinks_.append(NetworkLink{target_->getRealPosition(), beacons_[i]->getRealPosition(), 0.3f, LinkType::TargetToBeacon});
             }
         }
     }
 
-    // 4. РЕТРАНСЛЯЦИЯ MESH-СЕТИ (Доставка до Вышек) 
+    // 4. Ретрансляция Mesh-сети (Доставка до Вышек) 
     MutableArraySequence<Point2D> towers = environment_->getStaticTowers(); // Запрашиваем вышки
 
     for (int i = 0; i < beacons_.get_length(); ++i) {
@@ -130,7 +139,7 @@ void Navigator::updateEntities(float dt) {
             bool deliveredToTower = false;
             for (int t = 0; t < towers.get_length(); ++t) {
                 if (math::distance(beacons_[i]->getRealPosition(), towers[t]) < g_Settings.meshCommRadius) {
-                    // ЗЕЛЕНАЯ СВЯЗЬ: Beacon -> Tower
+                    // Зеленая связь: Beacon -> Tower
                     activeLinks_.append(NetworkLink{beacons_[i]->getRealPosition(), towers[t], 0.3f, LinkType::BeaconToTower});
                     deliveredToTower = true;
                 }
@@ -143,7 +152,7 @@ void Navigator::updateEntities(float dt) {
 
                     if (math::distance(beacons_[i]->getRealPosition(), beacons_[j]->getRealPosition()) < g_Settings.meshCommRadius) {
                         beacons_[j]->receivePacket(packetsToTx[p]);
-                        // ГОЛУБАЯ СВЯЗЬ: Beacon -> Beacon
+                        // Голубая связь: Beacon -> Beacon
                         activeLinks_.append(NetworkLink{beacons_[i]->getRealPosition(), beacons_[j]->getRealPosition(), 0.3f, LinkType::BeaconToBeacon});
                     }
                 }

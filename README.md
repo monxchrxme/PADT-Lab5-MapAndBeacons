@@ -105,3 +105,11 @@ cmake --build build --config Release
 ```
 
 ![Simulation Settings Window](images/Simulation_settings_windows.png)
+
+![Main View Window](images/Main_View_window.png)
+
+![Mesh Network Window](images/Mesh_network.png)
+
+![AoA Vectors Window](images/AoA_vectors.png)
+
+![Multipath Bounces Window](images/Multipath_Bounces.png)
