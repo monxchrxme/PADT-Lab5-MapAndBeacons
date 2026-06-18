@@ -465,28 +465,22 @@ MutableArraySequence<RadioPath> EnvironmentManager::computePaths(Point2D tx, Poi
     paths.append(RadioPath{ tx, rx, distGround, arrivalVec, totalTransmittance * 0.7, 1, PathType::GROUND}); 
 
     // 3. Отражение от стены (Wall Bounce - ISM) 
-    int rx_t = static_cast<int>(std::floor(rx.x / Chunk::TILE_SIZE));
-    int ry_t = static_cast<int>(std::floor(rx.y / Chunk::TILE_SIZE));
-    int tx_t = static_cast<int>(std::floor(tx.x / Chunk::TILE_SIZE));
-    int ty_t = static_cast<int>(std::floor(tx.y / Chunk::TILE_SIZE));
+    const int searchRadius = 10;
+    // Ищем стены в радиусе searchRadius вокруг приемника 
+    int rx_tx = static_cast<int>(std::floor(rx.x / Chunk::TILE_SIZE));
+    int rx_ty = static_cast<int>(std::floor(rx.y / Chunk::TILE_SIZE));
 
-    // Создаем AABB (Bounding Box) между вышкой и нами, плюс запас 5 тайлов для отражений
-    const int PADDING = 5;
-    int minX = std::min(rx_t, tx_t) - PADDING;
-    int maxX = std::max(rx_t, tx_t) + PADDING;
-    int minY = std::min(ry_t, ty_t) - PADDING;
-    int maxY = std::max(ry_t, ty_t) + PADDING;
+    for (int dy_grid = -searchRadius; dy_grid <= searchRadius; ++dy_grid) {
+        for (int dx_grid = -searchRadius; dx_grid <= searchRadius; ++dx_grid) {
+            if (dx_grid == 0 && dy_grid == 0) {
+                continue; // Пропускаем тайл, на котором стоим
+            }
 
-    for (int tileY = minY; tileY <= maxY; ++tileY) {
-        for (int tileX = minX; tileX <= maxX; ++tileX) {
-            if (tileX == rx_t && tileY == ry_t) continue; // Пропускаем тайл, на котором стоим
-
-            double tileWorldX = tileX * Chunk::TILE_SIZE;
-            double tileWorldY = tileY * Chunk::TILE_SIZE;
+            double tileWorldX = (rx_tx + dx_grid) * Chunk::TILE_SIZE;
+            double tileWorldY = (rx_ty + dy_grid) * Chunk::TILE_SIZE;
             
             // Проверяем центр тайла на наличие стены
             Tile t = getTileAtWorldPos({ tileWorldX + Chunk::TILE_SIZE / 2.0, tileWorldY + Chunk::TILE_SIZE / 2.0 });
-
 
             if (t.type == TileType::WALL) {
                 
