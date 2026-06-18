@@ -418,7 +418,7 @@ MapBounds EnvironmentManager::getWorldBounds() const
         if (cy1 < minY) 
         {
             minY = cy1; 
-        }
+        } 
         if (cx2 > maxX) 
         {
             maxX = cx2;
