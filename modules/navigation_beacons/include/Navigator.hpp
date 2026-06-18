@@ -4,6 +4,15 @@
 #include "entities/MobileBeacon.hpp"
 #include "sequences/mutable_array_sequence.hpp"
 
+// Структура для хранения координат сектора
+struct SectorCoord {
+    int x;
+    int y;
+    bool operator==(const SectorCoord& other) const {
+        return x == other.x && y == other.y;
+    }
+};
+
 class Navigator final : public INavigator {
 private:
     const IEnvironment* environment_; // Невладеющий указатель на карту 
@@ -12,10 +21,16 @@ private:
     TargetObject* target_;
     MutableArraySequence<MobileBeacon*> beacons_;
 
-    // ДАННЫЕ ДЛЯ СЕТИ 
+    // Данные для сети 
     MutableArraySequence<NetworkLink> activeLinks_; // Линии передачи для UI
     int packetIdCounter_ = 0;                       // Генератор уникальных ID
     float timeSinceLastPacket_ = 0.0f;              // Таймер отправки
+
+    // Память для секторов: запоминаем, где уже были созданы маяки
+    MutableArraySequence<SectorCoord> spawnedSectors_;
+    // Метод для ленивой генерации маяков
+    void checkAndSpawnBeacons();
+
 
 public:
     explicit Navigator(const IEnvironment* env);

@@ -7,15 +7,8 @@ Navigator::Navigator(const IEnvironment* env) : environment_(env) {
     if (!environment_) {
         throw std::invalid_argument("Navigator: Environment cannot be null.");
     }
-
     // Спавним главную цель в центре (400, 300) со скоростью 100 пикс/сек
     target_ = new TargetObject({600.0, 300.0}, 100.0f);
-
-    // Спавним 3 мобильных маяка в разных частях карты
-    // Скорость 50 пикс/сек, двигаются в разных направлениях
-    beacons_.append(new MobileBeacon({100.0, 100.0}, {1.0, 0.5}, 50.0f));
-    beacons_.append(new MobileBeacon({700.0, 500.0}, {-1.0, -0.5}, 50.0f));
-    beacons_.append(new MobileBeacon({400.0, 100.0}, {0.0, 1.0}, 50.0f));
 }
 
 Navigator::~Navigator() {
@@ -27,7 +20,54 @@ Navigator::~Navigator() {
     }
 }
 
+void Navigator::checkAndSpawnBeacons() {
+    const double SECTOR_SIZE = 1200.0; // Размер одного сектора спавна
+    
+    Point2D targetPos = target_->getRealPosition();
+    int currentSectorX = static_cast<int>(std::floor(targetPos.x / SECTOR_SIZE));
+    int currentSectorY = static_cast<int>(std::floor(targetPos.y / SECTOR_SIZE));
+
+    // Проверяем сам сектор и 8 секторов вокруг него (квадрат 3x3)
+    for (int dx = -1; dx <= 1; ++dx) {
+        for (int dy = -1; dy <= 1; ++dy) {
+            int sx = currentSectorX + dx;
+            int sy = currentSectorY + dy;
+
+            // Проверяем, спавнили ли мы уже маяк в этом секторе
+            bool alreadySpawned = false;
+            for (int i = 0; i < spawnedSectors_.get_length(); ++i) {
+                if (spawnedSectors_[i].x == sx && spawnedSectors_[i].y == sy) {
+                    alreadySpawned = true;
+                    break;
+                }
+            }
+
+            if (!alreadySpawned) {
+                spawnedSectors_.append(SectorCoord{sx, sy}); // Запоминаем сектор
+
+                // Пытаемся найти проходимую точку в этом секторе (даем 10 попыток)
+                for (int attempt = 0; attempt < 10; ++attempt) {
+                    double randX = (sx * SECTOR_SIZE) + math::randomDouble(50.0, SECTOR_SIZE - 50.0);
+                    double randY = (sy * SECTOR_SIZE) + math::randomDouble(50.0, SECTOR_SIZE - 50.0);
+                    Point2D spawnPos{randX, randY};
+
+                    // Опрашиваем Карту: можно ли тут стоять (не вода ли это и не стена)
+                    if (environment_->isPassable(spawnPos)) {
+                        double vx = math::randomDouble(-1.0, 1.0);
+                        double vy = math::randomDouble(-1.0, 1.0);
+                        // Спавним маяк
+                        beacons_.append(new MobileBeacon(spawnPos, {vx, vy}, 50.0f, 400.0));
+                        break; // Маяк создан, переходим к следующему сектору
+                    }
+                }
+            }
+        }
+    }
+}
+
 void Navigator::updateEntities(float dt) {
+    checkAndSpawnBeacons();
+
     // 0. Очистка старых линий связи (эффект затухания) 
     MutableArraySequence<NetworkLink> aliveLinks;
     for (int i = 0; i < activeLinks_.get_length(); ++i) {

@@ -434,6 +434,8 @@ MapBounds EnvironmentManager::getWorldBounds() const
 MutableArraySequence<RadioPath> EnvironmentManager::computePaths(Point2D tx, Point2D rx, double frequencyGHz) const 
 {
     MutableArraySequence<RadioPath> paths;
+
+    // 1. Прямой луч (Line of Sight - LOS) 
     double distLOS = std::hypot(rx.x - tx.x, rx.y - tx.y);
     if (distLOS < 1.0) 
     {
@@ -449,25 +451,12 @@ MutableArraySequence<RadioPath> EnvironmentManager::computePaths(Point2D tx, Poi
     int dx = std::abs(x1 - x0), dy = -std::abs(y1 - y0);
     int sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1;
     int err = dx + dy;
-    bool hitWall = false; 
-    Point2D virtualTx = {0.0, 0.0};
 
     while (true) 
     {
         Tile t = getTileAtWorldPos({ x0 * Chunk::TILE_SIZE, y0 * Chunk::TILE_SIZE });
         totalTransmittance *= RadioPhysics::getTileTransmittance(t.type, frequencyGHz);
-        if (t.type == TileType::WALL && !hitWall) 
-        {
-            hitWall = true;
-            if (dx > std::abs(dy)) 
-            {
-                double wX = (sx > 0) ? x0 * Chunk::TILE_SIZE : (x0 + 1) * Chunk::TILE_SIZE;
-                virtualTx = { wX + (wX - tx.x), tx.y };
-            } else {
-                double wY = (sy > 0) ? y0 * Chunk::TILE_SIZE : (y0 + 1) * Chunk::TILE_SIZE;
-                virtualTx = { tx.x, wY + (wY - tx.y) };
-            }
-        }
+        
         if (totalTransmittance < 0.001 || (x0 == x1 && y0 == y1)) 
         {
             break;
@@ -485,23 +474,77 @@ MutableArraySequence<RadioPath> EnvironmentManager::computePaths(Point2D tx, Poi
 
     if (totalTransmittance >= 0.001) 
     {
-        paths.append(RadioPath{ distLOS, arrivalVec, totalTransmittance, 0 });
+        // Прямой луч (bouncePoint совпадает с rx, так как удара о стену нет)
+        paths.append(RadioPath{ tx, rx, distLOS, arrivalVec, totalTransmittance, 0, PathType::LOS });
     }
 
+    // 2. Отражение от земли (Ground Bounce)
     double distGround = std::sqrt(distLOS * distLOS + (10.0 + 2.0) * (10.0 + 2.0));
-    paths.append(RadioPath{ distGround, arrivalVec, totalTransmittance * 0.7, 1 });
+    paths.append(RadioPath{ tx, rx, distGround, arrivalVec, totalTransmittance * 0.7, 1, PathType::GROUND}); 
 
-    if (hitWall) 
-    {
-        double dBounce = std::hypot(rx.x - virtualTx.x, rx.y - virtualTx.y);
-        if (dBounce > 1.0) 
-        {
-            Point2D bAV = { (rx.x - virtualTx.x) / dBounce, (rx.y - virtualTx.y) / dBounce };
-            double cosTheta = (dx > std::abs(dy)) ? std::abs(bAV.x) : std::abs(bAV.y);
-            double rCoeff = RadioPhysics::getReflectionCoefficient(TileType::WALL, cosTheta, frequencyGHz);
-            if (rCoeff > 0.05) 
-            {
-                paths.append(RadioPath{ dBounce, bAV, totalTransmittance * rCoeff, 1 });
+    // 3. Отражение от стены (Wall Bounce - ISM) 
+    const int searchRadius = 10;
+    // Ищем стены в радиусе searchRadius вокруг приемника 
+    int rx_tx = static_cast<int>(std::floor(rx.x / Chunk::TILE_SIZE));
+    int rx_ty = static_cast<int>(std::floor(rx.y / Chunk::TILE_SIZE));
+
+    for (int dy_grid = -searchRadius; dy_grid <= searchRadius; ++dy_grid) {
+        for (int dx_grid = -searchRadius; dx_grid <= searchRadius; ++dx_grid) {
+            if (dx_grid == 0 && dy_grid == 0) {
+                continue; // Пропускаем тайл, на котором стоим
+            }
+
+            double tileWorldX = (rx_tx + dx_grid) * Chunk::TILE_SIZE;
+            double tileWorldY = (rx_ty + dy_grid) * Chunk::TILE_SIZE;
+            
+            // Проверяем центр тайла на наличие стены
+            Tile t = getTileAtWorldPos({ tileWorldX + Chunk::TILE_SIZE / 2.0, tileWorldY + Chunk::TILE_SIZE / 2.0 });
+
+            if (t.type == TileType::WALL) {
+                
+                // А) Проверка вертикальной грани тайла (Ось X)
+                double wallPlaneX = (tx.x < tileWorldX + Chunk::TILE_SIZE / 2.0) ? tileWorldX : tileWorldX + Chunk::TILE_SIZE;
+                Point2D virtualTx_X = { wallPlaneX + (wallPlaneX - tx.x), tx.y };
+                double dBounceX = std::hypot(rx.x - virtualTx_X.x, rx.y - virtualTx_X.y);
+
+                if (dBounceX > 1.0) {
+                    double t_param = (wallPlaneX - virtualTx_X.x) / (rx.x - virtualTx_X.x);
+                    Point2D bounceP = { wallPlaneX, virtualTx_X.y + t_param * (rx.y - virtualTx_X.y) };
+                    
+                    if (bounceP.y >= tileWorldY && bounceP.y <= tileWorldY + Chunk::TILE_SIZE) {
+                        Point2D bAV = { (rx.x - virtualTx_X.x) / dBounceX, (rx.y - virtualTx_X.y) / dBounceX };
+                        double rCoeff = RadioPhysics::getReflectionCoefficient(TileType::WALL, std::abs(bAV.x), frequencyGHz);
+                        
+                        if (rCoeff > 0.05) {
+                            double finalBounceAtten = totalTransmittance * rCoeff;
+                            if (finalBounceAtten > 0.001) {
+                                paths.append(RadioPath{ tx, bounceP, dBounceX, bAV, finalBounceAtten, 1, PathType::WALL });
+                            }
+                        }
+                    }
+                }
+
+                // Б) Проверка горизонтальной грани тайла (Ось Y)
+                double wallPlaneY = (tx.y < tileWorldY + Chunk::TILE_SIZE / 2.0) ? tileWorldY : tileWorldY + Chunk::TILE_SIZE;
+                Point2D virtualTx_Y = { tx.x, wallPlaneY + (wallPlaneY - tx.y) };
+                double dBounceY = std::hypot(rx.x - virtualTx_Y.x, rx.y - virtualTx_Y.y);
+
+                if (dBounceY > 1.0) {
+                    double t_param = (wallPlaneY - virtualTx_Y.y) / (rx.y - virtualTx_Y.y);
+                    Point2D bounceP = { virtualTx_Y.x + t_param * (rx.x - virtualTx_Y.x), wallPlaneY };
+                    
+                    if (bounceP.x >= tileWorldX && bounceP.x <= tileWorldX + Chunk::TILE_SIZE) {
+                        Point2D bAV = { (rx.x - virtualTx_Y.x) / dBounceY, (rx.y - virtualTx_Y.y) / dBounceY };
+                        double rCoeff = RadioPhysics::getReflectionCoefficient(TileType::WALL, std::abs(bAV.y), frequencyGHz);
+                        
+                        if (rCoeff > 0.05) {
+                            double finalBounceAtten = totalTransmittance * rCoeff;
+                            if (finalBounceAtten > 0.001) {
+                                paths.append(RadioPath{ tx, bounceP, dBounceY, bAV, finalBounceAtten, 1, PathType::WALL });
+                            }
+                        }
+                    }
+                }
             }
         }
     }
